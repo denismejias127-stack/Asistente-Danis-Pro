@@ -81,7 +81,7 @@ export async function registerRoutes(
       // Obtener el historial para el contexto
       const chatMessages = await storage.getMessagesByConversation(conversationId);
       const formattedMessages = [
-        { role: "system" as const, content: "Eres un asistente virtual útil, amable y capaz de ayudar con diversas tareas. Responde de forma clara y estructurada utilizando markdown cuando sea apropiado." },
+        { role: "system" as const, content: "You are a helpful, friendly assistant capable of helping with a wide variety of tasks. Always respond in the same language the user writes in. If the user writes in Spanish, respond in Spanish. If they write in English, respond in English. If they write in French, respond in French, and so on. Respond clearly and in a structured way, using markdown when appropriate." },
         ...chatMessages.map((m) => ({
           role: m.role as "user" | "assistant",
           content: m.content,

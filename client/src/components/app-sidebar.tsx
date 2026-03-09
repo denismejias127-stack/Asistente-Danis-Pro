@@ -45,7 +45,7 @@ export function AppSidebar() {
           variant={!currentId ? "default" : "outline"}
         >
           <Plus className="w-4 h-4" />
-          New Chat
+          Nueva conversación
         </Button>
       </SidebarHeader>
       
@@ -54,9 +54,9 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {isLoading ? (
-                <div className="p-4 text-sm text-muted-foreground">Loading...</div>
+                <div className="p-4 text-sm text-muted-foreground">Cargando...</div>
               ) : conversations?.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground text-center">No conversations yet</div>
+                <div className="p-4 text-sm text-muted-foreground text-center">No hay conversaciones aún</div>
               ) : (
                 conversations?.map((conv) => (
                   <SidebarMenuItem key={conv.id}>
@@ -69,7 +69,7 @@ export function AppSidebar() {
                         <div className="flex w-full items-center gap-2">
                           <MessageSquare className="w-4 h-4 shrink-0 text-muted-foreground group-data-[active=true]:text-foreground" />
                           <span className="truncate font-medium flex-1 text-left text-sm">
-                            {conv.title || "New Chat"}
+                            {conv.title || "Nueva conversación"}
                           </span>
                         </div>
                         <span className="text-[10px] text-muted-foreground pl-6">

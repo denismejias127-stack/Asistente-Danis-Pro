@@ -65,7 +65,7 @@ export default function ChatPage() {
         <div className="flex items-center gap-3">
           <SidebarTrigger className="text-muted-foreground hover:text-foreground transition-colors" />
           <h1 className="font-semibold text-sm">
-            {conversationData?.title || "New Chat"}
+            {conversationData?.title || "Nueva conversación"}
           </h1>
         </div>
       </header>
