@@ -3,15 +3,13 @@ import { conversations, messages, users, type User, type UpsertUser } from "@sha
 import { eq, desc, and } from "drizzle-orm";
 
 export interface IStorage {
-  // Auth
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-  // Conversations scoped by user
+  setUserPro(id: string, isPro: boolean): Promise<void>;
   getConversation(id: number, userId: string): Promise<typeof conversations.$inferSelect | undefined>;
   getAllConversations(userId: string): Promise<(typeof conversations.$inferSelect)[]>;
   createConversation(title: string, userId: string): Promise<typeof conversations.$inferSelect>;
   deleteConversation(id: number, userId: string): Promise<void>;
-  // Messages
   getMessagesByConversation(conversationId: number): Promise<(typeof messages.$inferSelect)[]>;
   createMessage(conversationId: number, role: string, content: string): Promise<typeof messages.$inferSelect>;
 }
@@ -26,12 +24,13 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .insert(users)
       .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: { ...userData, updatedAt: new Date() },
-      })
+      .onConflictDoUpdate({ target: users.id, set: { ...userData, updatedAt: new Date() } })
       .returning();
     return user;
+  }
+
+  async setUserPro(id: string, isPro: boolean): Promise<void> {
+    await db.update(users).set({ isPro, updatedAt: new Date() }).where(eq(users.id, id));
   }
 
   async getConversation(id: number, userId: string) {
@@ -43,11 +42,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllConversations(userId: string) {
-    return db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.userId, userId))
-      .orderBy(desc(conversations.createdAt));
+    return db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.createdAt));
   }
 
   async createConversation(title: string, userId: string) {
@@ -56,10 +51,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteConversation(id: number, userId: string) {
-    const [conv] = await db
-      .select()
-      .from(conversations)
-      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
+    const [conv] = await db.select().from(conversations).where(and(eq(conversations.id, id), eq(conversations.userId, userId)));
     if (!conv) return;
     await db.delete(messages).where(eq(messages.conversationId, id));
     await db.delete(conversations).where(eq(conversations.id, id));

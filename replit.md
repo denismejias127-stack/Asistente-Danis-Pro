@@ -1,124 +1,64 @@
-# AI Chat Application
+# AI Assistant — Full Stack App
 
 ## Overview
+A full-stack AI assistant app with chat (any language), voice messages, image generation, and video generation (paid, $10 one-time via Stripe).
 
-This is a full-stack AI chat application built with React on the frontend and Express.js on the backend. It provides a ChatGPT-like interface with a sidebar showing conversation history, real-time streaming AI responses via Server-Sent Events (SSE), and voice chat capabilities. Users can create conversations, send text messages, and use voice input/output. The AI responses are powered by OpenAI's API via Replit AI Integrations.
+## Stack
+- **Frontend**: React + Vite + TypeScript + Tailwind + Shadcn UI + Wouter
+- **Backend**: Express + TypeScript (tsx)
+- **Database**: PostgreSQL via Drizzle ORM
+- **Auth**: Replit OIDC (Login with Replit)
+- **AI**: OpenAI via Replit AI Integrations (no user API key needed)
+  - Chat: gpt-5.2 (streaming SSE)
+  - Voice: gpt-4o-mini-transcribe (STT) + gpt-audio (speech-to-speech)
+  - Images: gpt-image-1 (base64 response)
+- **Payments**: Stripe ($10 one-time for video generation Pro access)
 
-Key features:
-- Multi-conversation management with persistent history
-- Streaming text responses (SSE)
-- Voice chat (record audio, stream transcription + TTS response)
-- Markdown rendering with syntax highlighting in AI responses
-- Responsive sidebar layout
+## Key Files
+- `shared/schema.ts` — DB schema (users, sessions, conversations, messages)
+- `server/index.ts` — Express app entry, sets up auth before routes
+- `server/routes.ts` — All API routes (auth, conversations, chat SSE, image gen, Stripe)
+- `server/storage.ts` — Database CRUD operations
+- `server/replit_integrations/auth/replitAuth.ts` — Replit OIDC setup
+- `server/replit_integrations/audio/routes.ts` — Voice message endpoint
+- `client/src/App.tsx` — Auth guard (shows login page if not authenticated)
+- `client/src/pages/login.tsx` — Login page
+- `client/src/pages/chat-page.tsx` — Chat UI with image/video mode
+- `client/src/components/app-sidebar.tsx` — Sidebar with user info + logout
+- `client/src/components/chat/chat-input.tsx` — Input with mode switcher (chat/image/video)
+- `client/src/hooks/use-auth.ts` — Auth state hook
 
-## User Preferences
+## Features
+1. **Authentication** — Login with Replit account, sessions stored in DB
+2. **Chat** — Streaming AI chat in any language (auto-detects user's language)
+3. **Voice** — Record audio → transcribed → AI voice response
+4. **Image Generation** — Switch to Image mode, describe what you want, AI generates it
+5. **Video Generation** — Requires $10 Pro subscription via Stripe (paywall modal)
 
-Preferred communication style: Simple, everyday language.
+## Environment Variables Needed
+- `SESSION_SECRET` — Set automatically
+- `AI_INTEGRATIONS_OPENAI_API_KEY` — Provided by Replit AI Integrations
+- `AI_INTEGRATIONS_OPENAI_BASE_URL` — Provided by Replit AI Integrations
+- `DATABASE_URL` — Provided by Replit PostgreSQL
+- `STRIPE_SECRET_KEY` — Must be provided by user to enable payments
+- `STRIPE_WEBHOOK_SECRET` — Optional, for webhook signature verification
 
-## System Architecture
+## Routes
+- `GET /api/auth/user` — Current user info
+- `GET /api/login` — Start Replit OIDC login
+- `GET /api/logout` — Log out + redirect
+- `GET /api/conversations` — List user conversations
+- `POST /api/conversations` — Create new conversation
+- `GET /api/conversations/:id` — Get conversation with messages
+- `DELETE /api/conversations/:id` — Delete conversation
+- `POST /api/conversations/:id/messages` — Send chat message (SSE stream)
+- `POST /api/conversations/:id/voice-messages` — Send voice message (SSE stream)
+- `POST /api/generate-image` — Generate AI image
+- `POST /api/subscribe/video` — Create Stripe checkout session ($10)
+- `POST /api/stripe/webhook` — Stripe webhook (marks user as Pro)
+- `POST /api/generate-video` — Generate video (Pro users only)
 
-### Frontend Architecture
-
-- **Framework**: React 18 with TypeScript, built using Vite
-- **Routing**: Wouter (lightweight client-side router). Routes: `/` (new chat), `/c/:id` (existing conversation)
-- **State Management**: TanStack Query (React Query v5) for server state, local `useState` for UI state
-- **UI Components**: shadcn/ui (New York style) built on Radix UI primitives
-- **Styling**: Tailwind CSS with CSS variables for theming. Supports dark mode via `.dark` class
-- **Fonts**: Inter (sans-serif) and JetBrains Mono (monospace) from Google Fonts
-- **Animations**: Framer Motion for message entry animations
-- **Markdown**: react-markdown + remark-gfm + react-syntax-highlighter for rich message rendering
-
-**Component structure:**
-- `App.tsx` — Root, wraps with QueryClientProvider, SidebarProvider, TooltipProvider
-- `pages/chat-page.tsx` — Main chat view, assembles messages list + input
-- `components/app-sidebar.tsx` — Conversation list, new chat button, delete action
-- `components/chat/message-bubble.tsx` — Individual message with avatar
-- `components/chat/chat-input.tsx` — Textarea with send + voice record buttons
-- `components/chat/markdown-renderer.tsx` — Renders AI markdown with code copy
-
-**Key hooks:**
-- `use-conversations.ts` — CRUD for conversations via React Query
-- `use-chat.ts` — Handles SSE streaming, optimistic UI, conversation creation
-- `use-mobile.tsx` — Responsive breakpoint detection
-
-### Backend Architecture
-
-- **Framework**: Express.js with TypeScript, running via `tsx` in dev
-- **Entry point**: `server/index.ts` creates HTTP server and registers routes
-- **Routes**: `server/routes.ts` registers all API endpoints
-- **Storage layer**: `server/storage.ts` — `DatabaseStorage` class implementing `IStorage` interface, all DB calls go through this
-- **Build**: esbuild bundles server to `dist/index.cjs`, Vite builds client to `dist/public`
-- **Dev server**: Vite runs in middleware mode inside Express (HMR enabled)
-
-**API Endpoints:**
-- `GET /api/conversations` — list all conversations
-- `POST /api/conversations` — create new conversation
-- `GET /api/conversations/:id` — get conversation with messages
-- `DELETE /api/conversations/:id` — delete conversation and its messages
-- `POST /api/conversations/:id/messages` — send a message, returns SSE stream with AI response
-- `POST /api/conversations/:id/voice-messages` — send audio blob, returns SSE stream with transcript + TTS audio
-
-**SSE Streaming pattern:**
-The message creation endpoint saves the user message, then opens an OpenAI streaming completion and pipes chunks back to the client as SSE events. The client (`use-chat.ts`) reads the stream, accumulates content, and shows optimistic UI during generation. On completion, React Query cache is invalidated to reload from DB.
-
-### Replit Integrations
-
-The project has a `server/replit_integrations/` and `client/replit_integrations/` folder structure providing reusable modules:
-
-- **`chat/`** — Storage + routes for conversation/message management
-- **`audio/`** — Voice recording (MediaRecorder), PCM16 playback via AudioWorklet, speech-to-text, TTS streaming. Uses a ring buffer for smooth audio playback
-- **`image/`** — Image generation via `gpt-image-1` model
-- **`batch/`** — Batch processing with concurrency limiting (p-limit) and retry logic (p-retry) for rate-limited APIs
-
-### Data Storage
-
-- **Database**: PostgreSQL via `pg` driver
-- **ORM**: Drizzle ORM with `drizzle-zod` for schema validation
-- **Schema** (`shared/schema.ts`):
-  - `conversations` table: `id`, `title`, `created_at`
-  - `messages` table: `id`, `conversation_id` (FK → conversations, cascade delete), `role` (user/assistant), `content`, `created_at`
-- **Migrations**: Drizzle Kit, config in `drizzle.config.ts`, output to `./migrations/`
-- **Connection**: `DATABASE_URL` environment variable required
-
-### Shared Code
-
-`shared/` folder is accessible from both client and server via `@shared/*` alias:
-- `schema.ts` — Drizzle table definitions + Zod insert schemas + TypeScript types
-- `routes.ts` — Typed API route definitions (method, path, input/response Zod schemas). Used by both client hooks and server route handlers to ensure consistency
-
-### Authentication
-
-No authentication system is currently implemented. Sessions/auth can be added — `connect-pg-simple` is listed as a dependency suggesting session-based auth was considered.
-
-## External Dependencies
-
-### AI / LLM
-- **OpenAI API** via Replit AI Integrations proxy
-  - Environment variables: `AI_INTEGRATIONS_OPENAI_API_KEY`, `AI_INTEGRATIONS_OPENAI_BASE_URL`
-  - Used for: chat completions (streaming), speech-to-text (Whisper), text-to-speech, image generation (`gpt-image-1`)
-  - Client initialized in `server/routes.ts` and `server/replit_integrations/*/client.ts`
-
-### Database
-- **PostgreSQL** — requires `DATABASE_URL` environment variable
-- Provisioned separately (Replit Postgres or external)
-
-### Key NPM Packages
-
-| Package | Purpose |
-|---|---|
-| `drizzle-orm` + `drizzle-zod` | ORM + schema validation |
-| `openai` | OpenAI API client |
-| `@tanstack/react-query` | Server state management |
-| `wouter` | Client routing |
-| `framer-motion` | Animations |
-| `react-markdown` + `remark-gfm` | Markdown rendering |
-| `react-syntax-highlighter` | Code block highlighting |
-| `p-limit` + `p-retry` | Batch processing concurrency/retries |
-| `date-fns` | Date formatting in sidebar |
-| `lucide-react` | Icons |
-| `zod` | Schema validation |
-
-### Replit-specific Plugins (dev only)
-- `@replit/vite-plugin-runtime-error-modal` — Error overlay
-- `@replit/vite-plugin-cartographer` — File map
-- `@replit/vite-plugin-dev-banner` — Dev banner
+## Deployment
+- Target: Autoscale
+- Build: `npm run build`
+- Run: `npm run start`
