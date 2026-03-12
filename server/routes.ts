@@ -323,6 +323,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── PayPal.me: Confirm Payment (honor system) ───────────────────────────────
+  app.post("/api/subscribe/video/confirm", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+    try {
+      await storage.setUserPro(userId, true);
+      req.session.isPro = true;
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Confirm payment error:", e);
+      res.status(500).json({ error: "Error al activar el acceso" });
+    }
+  });
+
   // ── Video Generation ────────────────────────────────────────────────────────
   app.post("/api/generate-video", async (req, res) => {
     const userId = requireUser(req, res);
