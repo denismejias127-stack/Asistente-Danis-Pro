@@ -39,9 +39,7 @@ async function getPayPalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !secret) throw new Error("PayPal no configurado");
-  const base = process.env.PAYPAL_SANDBOX === "true"
-    ? "https://api-m.sandbox.paypal.com"
-    : "https://api-m.paypal.com";
+  const base = getPayPalBase();
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: "POST",
     headers: {
@@ -50,7 +48,11 @@ async function getPayPalAccessToken(): Promise<string> {
     },
     body: "grant_type=client_credentials",
   });
-  if (!res.ok) throw new Error("Error obteniendo token de PayPal");
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`PayPal auth error ${res.status}:`, body);
+    throw new Error(`PayPal auth failed (${res.status}): ${body}`);
+  }
   const data = await res.json() as any;
   return data.access_token;
 }
@@ -243,7 +245,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/paypal/client-id", (req, res) => {
     const clientId = process.env.PAYPAL_CLIENT_ID;
     if (!clientId) return res.status(503).json({ configured: false });
-    res.json({ clientId, configured: true });
+    const isSandbox = process.env.PAYPAL_SANDBOX === "true";
+    res.json({ clientId, configured: true, sandbox: isSandbox });
+  });
+
+  // ── PayPal: Verify credentials ──────────────────────────────────────────────
+  app.get("/api/paypal/verify", async (_req, res) => {
+    try {
+      const token = await getPayPalAccessToken();
+      res.json({ ok: true, sandbox: process.env.PAYPAL_SANDBOX === "true", hasToken: !!token });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e?.message || "unknown" });
+    }
   });
 
   // ── PayPal: Create Order ────────────────────────────────────────────────────
@@ -267,12 +280,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           application_context: { user_action: "PAY_NOW", brand_name: "AI Assistant" },
         }),
       });
-      if (!response.ok) throw new Error("Error PayPal");
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`PayPal create order error ${response.status}:`, body);
+        throw new Error(`PayPal order failed (${response.status})`);
+      }
       const order = await response.json() as any;
       res.json({ orderID: order.id });
-    } catch (error) {
-      console.error("PayPal create order error:", error);
-      res.status(500).json({ error: "Error al crear el pago" });
+    } catch (error: any) {
+      console.error("PayPal create order error:", error?.message || error);
+      res.status(500).json({ error: "Error al crear el pago: " + (error?.message || "desconocido") });
     }
   });
 
