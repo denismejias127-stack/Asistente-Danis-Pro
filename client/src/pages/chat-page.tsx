@@ -14,6 +14,7 @@ import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateConversation } from "@/hooks/use-conversations";
 import { useLocation } from "wouter";
+import { PayPalButton } from "@/components/paypal-button";
 
 type GenMode = "chat" | "image" | "video";
 
@@ -33,7 +34,6 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [showVideoPaywall, setShowVideoPaywall] = useState(false);
-  const [isRedirectingStripe, setIsRedirectingStripe] = useState(false);
 
   // Read mode from URL query param
   const searchParams = new URLSearchParams(search);
@@ -114,26 +114,6 @@ export default function ChatPage() {
     }
   };
 
-  const handleSubscribeVideo = async () => {
-    setIsRedirectingStripe(true);
-    try {
-      const res = await fetch("/api/subscribe/video", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        toast({ title: "Error", description: data.error || "No se pudo iniciar el pago.", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Error", description: "Error de conexión.", variant: "destructive" });
-    } finally {
-      setIsRedirectingStripe(false);
-    }
-  };
 
   const modeInfo = {
     chat: null,
@@ -284,21 +264,9 @@ export default function ChatPage() {
                   <span className="text-muted-foreground text-sm ml-1">pago único</span>
                 </div>
 
-                <Button
-                  className="w-full h-12 rounded-xl text-base"
-                  onClick={handleSubscribeVideo}
-                  disabled={isRedirectingStripe}
-                  data-testid="button-pay-video"
-                >
-                  {isRedirectingStripe ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />
-                      Redirigiendo...
-                    </span>
-                  ) : (
-                    "Pagar con tarjeta"
-                  )}
-                </Button>
+                <div className="w-full" data-testid="paypal-container">
+                  <PayPalButton onSuccess={() => setShowVideoPaywall(false)} />
+                </div>
               </div>
             </motion.div>
           </motion.div>

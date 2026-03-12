@@ -5,20 +5,46 @@ import { api } from "@shared/routes";
 import { isAuthenticated } from "./replit_integrations/auth/replitAuth";
 import { registerAudioRoutes } from "./replit_integrations/audio/routes";
 import OpenAI from "openai";
-import Stripe from "stripe";
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
-function getStripe(): Stripe | null {
-  if (!process.env.STRIPE_SECRET_KEY) return null;
-  return new Stripe(process.env.STRIPE_SECRET_KEY);
-}
+const PAYPAL_VIDEO_PRICE = "10.00";
+const PAYPAL_CURRENCY = "USD";
 
 function getUserId(req: any): string {
   return req.user?.claims?.sub as string;
+}
+
+// PayPal helpers
+async function getPayPalAccessToken(): Promise<string> {
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const secret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!clientId || !secret) throw new Error("PayPal credentials not configured");
+
+  const base = process.env.PAYPAL_SANDBOX === "true"
+    ? "https://api-m.sandbox.paypal.com"
+    : "https://api-m.paypal.com";
+
+  const res = await fetch(`${base}/v1/oauth2/token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${Buffer.from(`${clientId}:${secret}`).toString("base64")}`,
+    },
+    body: "grant_type=client_credentials",
+  });
+  if (!res.ok) throw new Error("Failed to get PayPal access token");
+  const data = await res.json() as any;
+  return data.access_token;
+}
+
+function getPayPalBase() {
+  return process.env.PAYPAL_SANDBOX === "true"
+    ? "https://api-m.sandbox.paypal.com"
+    : "https://api-m.paypal.com";
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
@@ -37,7 +63,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const conversations = await storage.getAllConversations(getUserId(req));
       res.json(conversations);
-    } catch (e) {
+    } catch {
       res.status(500).json({ error: "Error al cargar conversaciones" });
     }
   });
@@ -49,7 +75,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!conversation) return res.status(404).json({ error: "Conversación no encontrada" });
       const messages = await storage.getMessagesByConversation(id);
       res.json({ ...conversation, messages });
-    } catch (e) {
+    } catch {
       res.status(500).json({ error: "Error al cargar conversación" });
     }
   });
@@ -59,7 +85,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { title } = req.body;
       const conversation = await storage.createConversation(title || "Nueva conversación", getUserId(req));
       res.status(201).json(conversation);
-    } catch (e) {
+    } catch {
       res.status(500).json({ error: "Error al crear conversación" });
     }
   });
@@ -69,7 +95,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const id = parseInt(req.params.id);
       await storage.deleteConversation(id, getUserId(req));
       res.status(204).send();
-    } catch (e) {
+    } catch {
       res.status(500).json({ error: "Error al eliminar conversación" });
     }
   });
@@ -92,7 +118,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         {
           role: "system" as const,
           content:
-            "You are a helpful, friendly AI assistant. Respond in the same language the user writes in. Use markdown when helpful. You can generate images when asked — just tell the user you are generating one and the frontend will handle the request.",
+            "You are a helpful, friendly AI assistant. Respond in the same language the user writes in. Use markdown when helpful.",
         },
         ...chatMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       ];
@@ -136,9 +162,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const { prompt, conversationId } = req.body;
       if (!prompt) return res.status(400).json({ error: "Se requiere un prompt" });
 
-      const userId = getUserId(req);
-
-      // Save user request message
       if (conversationId) {
         await storage.createMessage(conversationId, "user", `🎨 Generar imagen: ${prompt}`);
       }
@@ -156,7 +179,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const imageDataUrl = `data:image/png;base64,${imageBase64}`;
       const markdownImage = `![Imagen generada: ${prompt}](${imageDataUrl})`;
 
-      // Save assistant message with the image
       if (conversationId) {
         await storage.createMessage(conversationId, "assistant", markdownImage);
       }
@@ -168,76 +190,95 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ── Video Subscription (Stripe $10) ────────────────────────────────────────
-  app.post("/api/subscribe/video", isAuthenticated, async (req, res) => {
-    const stripe = getStripe();
-    if (!stripe) {
+  // ── PayPal: Create Order ($10 for Pro video access) ─────────────────────────
+  app.post("/api/subscribe/video/create-order", isAuthenticated, async (req, res) => {
+    if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
       return res.status(503).json({ error: "Pagos no configurados aún. Contacta al administrador." });
     }
 
     try {
-      const userId = getUserId(req);
-      const user = await storage.getUser(userId);
-      if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+      const accessToken = await getPayPalAccessToken();
+      const base = getPayPalBase();
 
-      const origin = `${req.protocol}://${req.hostname}`;
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        mode: "payment",
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: "Generación de Video con IA",
-                description: "Acceso para generar videos con inteligencia artificial",
-              },
-              unit_amount: 1000, // $10.00
+      const response = await fetch(`${base}/v2/checkout/orders`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          intent: "CAPTURE",
+          purchase_units: [
+            {
+              amount: { currency_code: PAYPAL_CURRENCY, value: PAYPAL_VIDEO_PRICE },
+              description: "Generación de Video con IA — Acceso Pro de por vida",
             },
-            quantity: 1,
+          ],
+          application_context: {
+            user_action: "PAY_NOW",
+            brand_name: "AI Assistant",
           },
-        ],
-        customer_email: user.email || undefined,
-        metadata: { userId },
-        success_url: `${origin}/?video_success=1`,
-        cancel_url: `${origin}/`,
+        }),
       });
 
-      res.json({ url: session.url });
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("PayPal create order error:", err);
+        return res.status(500).json({ error: "Error al crear la orden de pago" });
+      }
+
+      const order = await response.json() as any;
+      res.json({ orderID: order.id });
     } catch (error) {
-      console.error("Stripe error:", error);
-      res.status(500).json({ error: "Error al crear sesión de pago" });
+      console.error("PayPal error:", error);
+      res.status(500).json({ error: "Error al procesar el pago" });
     }
   });
 
-  // ── Stripe Webhook ──────────────────────────────────────────────────────────
-  app.post("/api/stripe/webhook", async (req, res) => {
-    const stripe = getStripe();
-    if (!stripe) return res.status(200).send();
-
-    const sig = req.headers["stripe-signature"];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    let event: Stripe.Event;
+  // ── PayPal: Capture Order (confirm payment, grant Pro) ──────────────────────
+  app.post("/api/subscribe/video/capture-order", isAuthenticated, async (req, res) => {
     try {
-      if (webhookSecret && sig) {
-        event = stripe.webhooks.constructEvent(req.rawBody as Buffer, sig, webhookSecret);
-      } else {
-        event = req.body as Stripe.Event;
-      }
-    } catch (err) {
-      return res.status(400).send(`Webhook Error: ${err}`);
-    }
+      const { orderID } = req.body;
+      if (!orderID) return res.status(400).json({ error: "orderID requerido" });
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as Stripe.CheckoutSession;
-      const userId = session.metadata?.userId;
-      if (userId) {
+      const accessToken = await getPayPalAccessToken();
+      const base = getPayPalBase();
+
+      const response = await fetch(`${base}/v2/checkout/orders/${orderID}/capture`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("PayPal capture error:", err);
+        return res.status(500).json({ error: "Error al confirmar el pago" });
+      }
+
+      const capture = await response.json() as any;
+      const status = capture.status;
+
+      if (status === "COMPLETED") {
+        const userId = getUserId(req);
         await storage.setUserPro(userId, true);
+        return res.json({ success: true, message: "¡Pago completado! Ya tienes acceso Pro." });
       }
-    }
 
-    res.json({ received: true });
+      res.status(400).json({ error: "El pago no fue completado", status });
+    } catch (error) {
+      console.error("PayPal capture error:", error);
+      res.status(500).json({ error: "Error al confirmar el pago" });
+    }
+  });
+
+  // ── PayPal Client ID (public, for frontend SDK) ─────────────────────────────
+  app.get("/api/paypal/client-id", (req, res) => {
+    const clientId = process.env.PAYPAL_CLIENT_ID;
+    if (!clientId) return res.status(503).json({ configured: false });
+    res.json({ clientId, configured: true });
   });
 
   // ── Video Generation ────────────────────────────────────────────────────────
@@ -246,11 +287,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
       if (!user?.isPro) {
-        return res.status(403).json({ error: "Se requiere suscripción Pro para generar videos", requiresUpgrade: true });
+        return res.status(403).json({ error: "Se requiere acceso Pro para generar videos", requiresUpgrade: true });
       }
-      // Video generation placeholder — connect a video API (Luma AI, Runway, etc.)
-      res.status(503).json({ error: "Generación de video próximamente. El pago fue registrado correctamente." });
-    } catch (error) {
+      res.status(503).json({ error: "Generación de video próximamente disponible." });
+    } catch {
       res.status(500).json({ error: "Error al generar el video" });
     }
   });
