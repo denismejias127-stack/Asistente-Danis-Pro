@@ -1,27 +1,25 @@
 import express, { type Express, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { openai, speechToText, ensureCompatibleFormat } from "./client";
-import { isAuthenticated } from "../auth/replitAuth";
 
 const audioBodyParser = express.json({ limit: "50mb" });
 
+function getEffectiveUserId(req: any): string | null {
+  return req.session?.userId ?? null;
+}
+
 export function registerAudioRoutes(app: Express): void {
-  // Voice message endpoint — requires auth
-  app.post("/api/conversations/:id/voice-messages", isAuthenticated, audioBodyParser, async (req: Request, res: Response) => {
+  app.post("/api/conversations/:id/voice-messages", audioBodyParser, async (req: Request, res: Response) => {
     try {
       const conversationId = parseInt(req.params.id);
-      const userId = (req.user as any)?.claims?.sub as string;
+      const userId = getEffectiveUserId(req);
+      if (!userId) return res.status(401).json({ error: "No autenticado" });
+
       const { audio, voice = "alloy" } = req.body;
+      if (!audio) return res.status(400).json({ error: "Se requieren datos de audio (base64)" });
 
-      if (!audio) {
-        return res.status(400).json({ error: "Se requieren datos de audio (base64)" });
-      }
-
-      // Verify conversation belongs to user
       const conversation = await storage.getConversation(conversationId, userId);
-      if (!conversation) {
-        return res.status(404).json({ error: "Conversación no encontrada" });
-      }
+      if (!conversation) return res.status(404).json({ error: "Conversación no encontrada" });
 
       const rawBuffer = Buffer.from(audio, "base64");
       const { buffer: audioBuffer, format: inputFormat } = await ensureCompatibleFormat(rawBuffer);
@@ -65,7 +63,7 @@ export function registerAudioRoutes(app: Express): void {
       res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantTranscript })}\n\n`);
       res.end();
     } catch (error) {
-      console.error("Error processing voice message:", error);
+      console.error("Voice message error:", error);
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ type: "error", error: "Error procesando el audio" })}\n\n`);
         res.end();

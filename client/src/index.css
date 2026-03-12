@@ -80,6 +80,24 @@
     font-family: var(--font-sans);
   }
 
+  /* Mobile: prevent overscroll and handle keyboard */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: manipulation;
+  }
+
+  /* Safe area for iPhone notch/home bar */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Prevent text size adjustment on mobile */
+  body {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   /* Custom scrollbar for a cleaner look */
   ::-webkit-scrollbar {
     width: 6px;

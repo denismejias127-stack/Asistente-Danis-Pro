@@ -10,22 +10,7 @@ import NotFound from "@/pages/not-found";
 import ChatPage from "@/pages/chat-page";
 import LoginPage from "@/pages/login";
 
-function AuthenticatedApp() {
-  return (
-    <SidebarProvider style={{ "--sidebar-width": "18rem", "--sidebar-width-icon": "4rem" } as React.CSSProperties}>
-      <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
-        <AppSidebar />
-        <Switch>
-          <Route path="/" component={ChatPage} />
-          <Route path="/c/:id" component={ChatPage} />
-          <Route component={NotFound} />
-        </Switch>
-      </div>
-    </SidebarProvider>
-  );
-}
-
-function AppRouter() {
+function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
@@ -40,14 +25,25 @@ function AppRouter() {
     return <LoginPage />;
   }
 
-  return <AuthenticatedApp />;
+  return (
+    <SidebarProvider style={{ "--sidebar-width": "18rem", "--sidebar-width-icon": "4rem" } as React.CSSProperties}>
+      <div className="flex h-[100dvh] w-full bg-background text-foreground overflow-hidden">
+        <AppSidebar />
+        <Switch>
+          <Route path="/" component={ChatPage} />
+          <Route path="/c/:id" component={ChatPage} />
+          <Route component={NotFound} />
+        </Switch>
+      </div>
+    </SidebarProvider>
+  );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppRouter />
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

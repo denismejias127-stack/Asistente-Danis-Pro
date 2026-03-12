@@ -15,7 +15,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
@@ -26,30 +25,22 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
 
-  const currentId = location.startsWith('/c/') ? parseInt(location.split('/')[2]) : null;
-
-  const handleNewChat = () => setLocation('/');
+  const currentId = location.startsWith("/c/") ? parseInt(location.split("/")[2]) : null;
 
   const handleDelete = (e: React.MouseEvent, id: number) => {
     e.preventDefault();
     e.stopPropagation();
     deleteMutation.mutate(id, {
-      onSuccess: () => { if (currentId === id) setLocation('/'); }
+      onSuccess: () => { if (currentId === id) setLocation("/"); },
     });
   };
-
-  const userInitials = [user?.firstName, user?.lastName]
-    .filter(Boolean)
-    .map((n) => n![0])
-    .join("")
-    .toUpperCase() || "?";
 
   return (
     <Sidebar>
       <SidebarHeader className="p-4 space-y-2">
         <Button
-          onClick={handleNewChat}
-          className="w-full justify-start gap-2 shadow-sm"
+          onClick={() => setLocation("/")}
+          className="w-full justify-start gap-2"
           variant={!currentId ? "default" : "outline"}
           data-testid="button-new-chat"
         >
@@ -57,13 +48,13 @@ export function AppSidebar() {
           Nueva conversación
         </Button>
 
-        {/* Quick actions */}
+        {/* Mode shortcuts */}
         <div className="flex gap-2">
           <Button
             variant="ghost"
             size="sm"
             className="flex-1 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setLocation('/?mode=image')}
+            onClick={() => setLocation("/?mode=image")}
             data-testid="button-image-mode"
           >
             <Image className="w-3.5 h-3.5" />
@@ -73,7 +64,7 @@ export function AppSidebar() {
             variant="ghost"
             size="sm"
             className="flex-1 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setLocation('/?mode=video')}
+            onClick={() => setLocation("/?mode=video")}
             data-testid="button-video-mode"
           >
             <Video className="w-3.5 h-3.5" />
@@ -131,32 +122,24 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4 border-t border-border">
         <div className="flex items-center gap-3">
-          <Avatar className="w-8 h-8 border border-border shrink-0">
-            <AvatarImage src={user?.profileImageUrl || undefined} />
-            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
-              {userInitials}
-            </AvatarFallback>
-          </Avatar>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-medium truncate">
-                {user?.firstName || user?.email || "Usuario"}
-              </p>
+              <p className="text-sm font-medium truncate">{user?.email || "Invitado"}</p>
               {user?.isPro && (
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 shrink-0">
                   <Crown className="w-2.5 h-2.5 mr-0.5" />
                   Pro
                 </Badge>
               )}
             </div>
-            <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
+            <p className="text-xs text-muted-foreground">Cambiar cuenta</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             className="w-8 h-8 text-muted-foreground hover:text-foreground shrink-0"
-            onClick={logout}
-            title="Cerrar sesión"
+            onClick={() => logout()}
+            title="Cambiar cuenta"
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />

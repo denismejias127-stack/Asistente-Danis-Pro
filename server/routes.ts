@@ -2,9 +2,16 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
-import { isAuthenticated } from "./replit_integrations/auth/replitAuth";
 import { registerAudioRoutes } from "./replit_integrations/audio/routes";
 import OpenAI from "openai";
+
+// Extend session type
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+    isPro?: boolean;
+  }
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -14,20 +21,27 @@ const openai = new OpenAI({
 const PAYPAL_VIDEO_PRICE = "10.00";
 const PAYPAL_CURRENCY = "USD";
 
-function getUserId(req: any): string {
-  return req.user?.claims?.sub as string;
+function getEffectiveUserId(req: any): string | null {
+  return req.session?.userId ?? null;
+}
+
+function requireUser(req: any, res: any): string | null {
+  const userId = getEffectiveUserId(req);
+  if (!userId) {
+    res.status(401).json({ message: "Inicia sesión primero" });
+    return null;
+  }
+  return userId;
 }
 
 // PayPal helpers
 async function getPayPalAccessToken(): Promise<string> {
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
-  if (!clientId || !secret) throw new Error("PayPal credentials not configured");
-
+  if (!clientId || !secret) throw new Error("PayPal no configurado");
   const base = process.env.PAYPAL_SANDBOX === "true"
     ? "https://api-m.sandbox.paypal.com"
     : "https://api-m.paypal.com";
-
   const res = await fetch(`${base}/v1/oauth2/token`, {
     method: "POST",
     headers: {
@@ -36,7 +50,7 @@ async function getPayPalAccessToken(): Promise<string> {
     },
     body: "grant_type=client_credentials",
   });
-  if (!res.ok) throw new Error("Failed to get PayPal access token");
+  if (!res.ok) throw new Error("Error obteniendo token de PayPal");
   const data = await res.json() as any;
   return data.access_token;
 }
@@ -50,50 +64,85 @@ function getPayPalBase() {
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   registerAudioRoutes(app);
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
+  // ── Email Login (no password) ───────────────────────────────────────────────
+  app.post("/api/auth/email-login", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ error: "Ingresa un correo válido" });
+      }
+      // Find existing account or create new one by email
+      const user = await storage.findOrCreateUserByEmail(email.toLowerCase().trim());
+      // Store in session — this is how they stay logged in
+      req.session.userId = user.id;
+      req.session.isPro = user.isPro ?? false;
+      res.json(user);
+    } catch (e) {
+      console.error("Email login error:", e);
+      res.status(500).json({ error: "Error al iniciar sesión" });
+    }
+  });
+
+  // ── Current User ────────────────────────────────────────────────────────────
   app.get("/api/auth/user", async (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    const userId = getUserId(req);
+    const userId = getEffectiveUserId(req);
+    if (!userId) return res.status(401).json({ message: "No autenticado" });
     const user = await storage.getUser(userId);
+    if (!user) return res.status(401).json({ message: "Usuario no encontrado" });
     res.json(user);
   });
 
+  // ── Logout ──────────────────────────────────────────────────────────────────
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy(() => {
+      res.json({ ok: true });
+    });
+  });
+
   // ── Conversations ───────────────────────────────────────────────────────────
-  app.get(api.conversations.list.path, isAuthenticated, async (req, res) => {
+  app.get(api.conversations.list.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
-      const conversations = await storage.getAllConversations(getUserId(req));
-      res.json(conversations);
+      const convs = await storage.getAllConversations(userId);
+      res.json(convs);
     } catch {
       res.status(500).json({ error: "Error al cargar conversaciones" });
     }
   });
 
-  app.get(api.conversations.get.path, isAuthenticated, async (req, res) => {
+  app.get(api.conversations.get.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
       const id = parseInt(req.params.id);
-      const conversation = await storage.getConversation(id, getUserId(req));
-      if (!conversation) return res.status(404).json({ error: "Conversación no encontrada" });
+      const conv = await storage.getConversation(id, userId);
+      if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
       const messages = await storage.getMessagesByConversation(id);
-      res.json({ ...conversation, messages });
+      res.json({ ...conv, messages });
     } catch {
       res.status(500).json({ error: "Error al cargar conversación" });
     }
   });
 
-  app.post(api.conversations.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.conversations.create.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
       const { title } = req.body;
-      const conversation = await storage.createConversation(title || "Nueva conversación", getUserId(req));
-      res.status(201).json(conversation);
+      const conv = await storage.createConversation(title || "Nueva conversación", userId);
+      res.status(201).json(conv);
     } catch {
       res.status(500).json({ error: "Error al crear conversación" });
     }
   });
 
-  app.delete(api.conversations.delete.path, isAuthenticated, async (req, res) => {
+  app.delete(api.conversations.delete.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
       const id = parseInt(req.params.id);
-      await storage.deleteConversation(id, getUserId(req));
+      await storage.deleteConversation(id, userId);
       res.status(204).send();
     } catch {
       res.status(500).json({ error: "Error al eliminar conversación" });
@@ -101,27 +150,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Chat (SSE streaming) ────────────────────────────────────────────────────
-  app.post(api.messages.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.messages.create.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
       const conversationId = parseInt(req.params.id);
-      const userId = getUserId(req);
       const { content } = req.body;
       if (!content) return res.status(400).json({ error: "El contenido es requerido" });
 
-      const conversation = await storage.getConversation(conversationId, userId);
-      if (!conversation) return res.status(404).json({ error: "Conversación no encontrada" });
+      const conv = await storage.getConversation(conversationId, userId);
+      if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
 
       await storage.createMessage(conversationId, "user", content);
       const chatMessages = await storage.getMessagesByConversation(conversationId);
-
-      const formattedMessages = [
-        {
-          role: "system" as const,
-          content:
-            "You are a helpful, friendly AI assistant. Respond in the same language the user writes in. Use markdown when helpful.",
-        },
-        ...chatMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      ];
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -129,16 +170,22 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const stream = await openai.chat.completions.create({
         model: "gpt-5.2",
-        messages: formattedMessages,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful, friendly AI assistant. Always respond in the same language the user writes in. Use markdown when helpful.",
+          },
+          ...chatMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        ],
         stream: true,
       });
 
       let fullResponse = "";
       for await (const chunk of stream) {
-        const chunkContent = chunk.choices[0]?.delta?.content || "";
-        if (chunkContent) {
-          fullResponse += chunkContent;
-          res.write(`data: ${JSON.stringify({ content: chunkContent })}\n\n`);
+        const text = chunk.choices[0]?.delta?.content || "";
+        if (text) {
+          fullResponse += text;
+          res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
         }
       }
 
@@ -146,7 +193,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Chat error:", error);
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Error de conexión" })}\n\n`);
         res.end();
@@ -157,7 +204,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // ── Image Generation ────────────────────────────────────────────────────────
-  app.post("/api/generate-image", isAuthenticated, async (req, res) => {
+  app.post("/api/generate-image", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
     try {
       const { prompt, conversationId } = req.body;
       if (!prompt) return res.status(400).json({ error: "Se requiere un prompt" });
@@ -185,114 +234,87 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       res.json({ imageUrl: imageDataUrl, markdown: markdownImage });
     } catch (error) {
-      console.error("Error generating image:", error);
+      console.error("Image gen error:", error);
       res.status(500).json({ error: "Error al generar la imagen" });
     }
   });
 
-  // ── PayPal: Create Order ($10 for Pro video access) ─────────────────────────
-  app.post("/api/subscribe/video/create-order", isAuthenticated, async (req, res) => {
-    if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
-      return res.status(503).json({ error: "Pagos no configurados aún. Contacta al administrador." });
-    }
-
-    try {
-      const accessToken = await getPayPalAccessToken();
-      const base = getPayPalBase();
-
-      const response = await fetch(`${base}/v2/checkout/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          intent: "CAPTURE",
-          purchase_units: [
-            {
-              amount: { currency_code: PAYPAL_CURRENCY, value: PAYPAL_VIDEO_PRICE },
-              description: "Generación de Video con IA — Acceso Pro de por vida",
-            },
-          ],
-          application_context: {
-            user_action: "PAY_NOW",
-            brand_name: "AI Assistant",
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        console.error("PayPal create order error:", err);
-        return res.status(500).json({ error: "Error al crear la orden de pago" });
-      }
-
-      const order = await response.json() as any;
-      res.json({ orderID: order.id });
-    } catch (error) {
-      console.error("PayPal error:", error);
-      res.status(500).json({ error: "Error al procesar el pago" });
-    }
-  });
-
-  // ── PayPal: Capture Order (confirm payment, grant Pro) ──────────────────────
-  app.post("/api/subscribe/video/capture-order", isAuthenticated, async (req, res) => {
-    try {
-      const { orderID } = req.body;
-      if (!orderID) return res.status(400).json({ error: "orderID requerido" });
-
-      const accessToken = await getPayPalAccessToken();
-      const base = getPayPalBase();
-
-      const response = await fetch(`${base}/v2/checkout/orders/${orderID}/capture`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        console.error("PayPal capture error:", err);
-        return res.status(500).json({ error: "Error al confirmar el pago" });
-      }
-
-      const capture = await response.json() as any;
-      const status = capture.status;
-
-      if (status === "COMPLETED") {
-        const userId = getUserId(req);
-        await storage.setUserPro(userId, true);
-        return res.json({ success: true, message: "¡Pago completado! Ya tienes acceso Pro." });
-      }
-
-      res.status(400).json({ error: "El pago no fue completado", status });
-    } catch (error) {
-      console.error("PayPal capture error:", error);
-      res.status(500).json({ error: "Error al confirmar el pago" });
-    }
-  });
-
-  // ── PayPal Client ID (public, for frontend SDK) ─────────────────────────────
+  // ── PayPal Client ID ────────────────────────────────────────────────────────
   app.get("/api/paypal/client-id", (req, res) => {
     const clientId = process.env.PAYPAL_CLIENT_ID;
     if (!clientId) return res.status(503).json({ configured: false });
     res.json({ clientId, configured: true });
   });
 
-  // ── Video Generation ────────────────────────────────────────────────────────
-  app.post("/api/generate-video", isAuthenticated, async (req, res) => {
-    try {
-      const userId = getUserId(req);
-      const user = await storage.getUser(userId);
-      if (!user?.isPro) {
-        return res.status(403).json({ error: "Se requiere acceso Pro para generar videos", requiresUpgrade: true });
-      }
-      res.status(503).json({ error: "Generación de video próximamente disponible." });
-    } catch {
-      res.status(500).json({ error: "Error al generar el video" });
+  // ── PayPal: Create Order ────────────────────────────────────────────────────
+  app.post("/api/subscribe/video/create-order", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+    if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+      return res.status(503).json({ error: "Pagos no configurados aún." });
     }
+    try {
+      const accessToken = await getPayPalAccessToken();
+      const response = await fetch(`${getPayPalBase()}/v2/checkout/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          intent: "CAPTURE",
+          purchase_units: [{
+            amount: { currency_code: PAYPAL_CURRENCY, value: PAYPAL_VIDEO_PRICE },
+            description: "Generación de Video con IA — Acceso Pro",
+          }],
+          application_context: { user_action: "PAY_NOW", brand_name: "AI Assistant" },
+        }),
+      });
+      if (!response.ok) throw new Error("Error PayPal");
+      const order = await response.json() as any;
+      res.json({ orderID: order.id });
+    } catch (error) {
+      console.error("PayPal create order error:", error);
+      res.status(500).json({ error: "Error al crear el pago" });
+    }
+  });
+
+  // ── PayPal: Capture Order ───────────────────────────────────────────────────
+  app.post("/api/subscribe/video/capture-order", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+    try {
+      const { orderID } = req.body;
+      if (!orderID) return res.status(400).json({ error: "orderID requerido" });
+
+      const accessToken = await getPayPalAccessToken();
+      const response = await fetch(`${getPayPalBase()}/v2/checkout/orders/${orderID}/capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!response.ok) throw new Error("Error capturando pago");
+      const capture = await response.json() as any;
+
+      if (capture.status === "COMPLETED") {
+        await storage.setUserPro(userId, true);
+        req.session.isPro = true;
+        return res.json({ success: true });
+      }
+
+      res.status(400).json({ error: "Pago no completado", status: capture.status });
+    } catch (error) {
+      console.error("PayPal capture error:", error);
+      res.status(500).json({ error: "Error al confirmar el pago" });
+    }
+  });
+
+  // ── Video Generation ────────────────────────────────────────────────────────
+  app.post("/api/generate-video", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+    const user = await storage.getUser(userId);
+    if (!user?.isPro) {
+      return res.status(403).json({ error: "Requiere acceso Pro", requiresUpgrade: true });
+    }
+    res.status(503).json({ error: "Generación de video próximamente." });
   });
 
   return httpServer;

@@ -10,6 +10,7 @@ async function fetchUser(): Promise<User | null> {
 
 export function useAuth() {
   const queryClient = useQueryClient();
+
   const { data: user, isLoading } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
     queryFn: fetchUser,
@@ -17,14 +18,42 @@ export function useAuth() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const logout = () => {
-    window.location.href = "/api/logout";
-  };
+  const loginMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await fetch("/api/auth/email-login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Error al iniciar sesión");
+      }
+      return res.json() as Promise<User>;
+    },
+    onSuccess: (user) => {
+      queryClient.setQueryData(["/api/auth/user"], user);
+    },
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    },
+    onSuccess: () => {
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
+    },
+  });
 
   return {
     user,
     isLoading,
     isAuthenticated: !!user,
-    logout,
+    login: loginMutation.mutateAsync,
+    isLoggingIn: loginMutation.isPending,
+    loginError: loginMutation.error?.message,
+    logout: logoutMutation.mutate,
   };
 }

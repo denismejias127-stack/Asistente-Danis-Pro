@@ -1,9 +1,12 @@
 import { db } from "./db";
 import { conversations, messages, users, type User, type UpsertUser } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  findOrCreateUserByEmail(email: string): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   setUserPro(id: string, isPro: boolean): Promise<void>;
   getConversation(id: number, userId: string): Promise<typeof conversations.$inferSelect | undefined>;
@@ -17,6 +20,23 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async findOrCreateUserByEmail(email: string): Promise<User> {
+    // Try to find existing user
+    const existing = await this.getUserByEmail(email);
+    if (existing) return existing;
+    // Create new user with email
+    const [user] = await db
+      .insert(users)
+      .values({ email, firstName: email.split("@")[0] })
+      .returning();
     return user;
   }
 
