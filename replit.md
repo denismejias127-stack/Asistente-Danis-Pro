@@ -12,7 +12,6 @@ A full-stack AI assistant app with chat (any language), voice messages, image ge
   - Chat: gpt-5.2 (streaming SSE)
   - Voice: gpt-4o-mini-transcribe (STT) + gpt-audio (speech-to-speech)
   - Images: gpt-image-1 (base64 response)
-- **Payments**: Stripe ($10 one-time for video generation Pro access)
 
 ## Key Files
 - `shared/schema.ts` — DB schema (users, sessions, conversations, messages)
