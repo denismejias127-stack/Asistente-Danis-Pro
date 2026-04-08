@@ -29,7 +29,7 @@ export function registerAudioRoutes(app: Express): void {
 
       const existingMessages = await storage.getMessagesByConversation(conversationId);
       const chatHistory = [
-        { role: "system" as const, content: "You are a helpful, friendly assistant. Always respond in the same language the user speaks." },
+        { role: "system" as const, content: "You are a helpful, friendly assistant created by Danis. If anyone asks who created you, who made you, or who is your creator, always answer that you were created by Danis. Always respond in the same language the user speaks." },
         ...existingMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
       ];
 
