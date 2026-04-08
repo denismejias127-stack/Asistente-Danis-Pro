@@ -6,15 +6,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
-import { Sparkles, Image as ImageIcon, Video, Crown, X } from "lucide-react";
+import { Sparkles, Image as ImageIcon, Video, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateConversation } from "@/hooks/use-conversations";
 import { useLocation } from "wouter";
-import { PayPalButton } from "@/components/paypal-button";
+import { AdWall } from "@/components/ad-wall";
 
 type GenMode = "chat" | "image" | "video";
 
@@ -33,18 +32,10 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
-  const [showVideoPaywall, setShowVideoPaywall] = useState(false);
+  const [showAdWall, setShowAdWall] = useState(false);
 
-  // Read mode from URL query param
   const searchParams = new URLSearchParams(search);
   const mode: GenMode = (searchParams.get("mode") as GenMode) || "chat";
-
-  useEffect(() => {
-    if (search.includes("video_success=1")) {
-      toast({ title: "¡Pago exitoso!", description: "Ya tienes acceso a generación de video." });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-    }
-  }, [search]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -77,10 +68,9 @@ export default function ChatPage() {
 
     if (mode === "video") {
       if (!user?.isPro) {
-        setShowVideoPaywall(true);
+        setShowAdWall(true);
         return;
       }
-      // Pro user video generation
       toast({ title: "Generando video...", description: "Esto puede tardar unos minutos." });
       return;
     }
@@ -106,14 +96,13 @@ export default function ChatPage() {
 
         queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, targetConvId] });
         queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
-      } catch (e) {
+      } catch {
         toast({ title: "Error", description: "No se pudo generar la imagen.", variant: "destructive" });
       } finally {
         setIsGeneratingMedia(false);
       }
     }
   };
-
 
   const modeInfo = {
     chat: null,
@@ -180,7 +169,7 @@ export default function ChatPage() {
                 : mode === "video"
                 ? user?.isPro
                   ? "Describe el video y lo genero para ti."
-                  : "Necesitas una suscripción Pro ($10) para generar videos."
+                  : "Ve 3 anuncios rápidos para desbloquear la generación de videos gratis."
                 : "Puedo responder preguntas, escribir código, ayudarte a crear contenido y más."}
             </motion.p>
           </div>
@@ -213,61 +202,37 @@ export default function ChatPage() {
         />
       </div>
 
-      {/* Video Paywall Modal */}
+      {/* Ad Wall Modal */}
       <AnimatePresence>
-        {showVideoPaywall && (
+        {showAdWall && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-            onClick={() => setShowVideoPaywall(false)}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-card border border-border rounded-3xl p-8 max-w-sm w-full shadow-2xl"
-              data-testid="modal-video-paywall"
+              className="bg-card border border-border rounded-3xl p-6 max-w-sm w-full shadow-2xl relative"
+              data-testid="modal-ad-wall"
             >
               <button
-                onClick={() => setShowVideoPaywall(false)}
+                onClick={() => setShowAdWall(false)}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-                data-testid="button-close-paywall"
+                data-testid="button-close-adwall"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="flex flex-col items-center text-center gap-5">
-                <div className="w-16 h-16 rounded-2xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <Crown className="w-8 h-8 text-yellow-500" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold">Generación de Video Pro</h3>
-                  <p className="text-muted-foreground text-sm mt-2">
-                    Genera videos con IA. Pago único, acceso de por vida.
-                  </p>
-                </div>
-
-                <div className="w-full rounded-2xl bg-primary/5 border border-primary/10 p-4 space-y-2">
-                  {["Videos generados con IA", "Calidad HD", "Sin marcas de agua", "Acceso instantáneo"].map((f) => (
-                    <div key={f} className="flex items-center gap-2 text-sm">
-                      <span className="text-green-500">✓</span>
-                      <span>{f}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="text-center">
-                  <span className="text-3xl font-bold">$10</span>
-                  <span className="text-muted-foreground text-sm ml-1">pago único</span>
-                </div>
-
-                <div className="w-full" data-testid="paypal-container">
-                  <PayPalButton onSuccess={() => setShowVideoPaywall(false)} />
-                </div>
+              <div className="flex flex-col items-center text-center gap-2 mb-4">
+                <Video className="w-8 h-8 text-blue-500" />
+                <h3 className="text-xl font-bold">Desbloquear Modo Video</h3>
               </div>
+
+              <AdWall onSuccess={() => setShowAdWall(false)} />
             </motion.div>
           </motion.div>
         )}
