@@ -80,6 +80,15 @@
     font-family: var(--font-sans);
   }
 
+  /* Full screen - no margins, no scrollbars on root */
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
   /* Mobile: prevent overscroll and handle keyboard */
   html, body {
     overscroll-behavior: none;
@@ -90,6 +99,9 @@
   /* Safe area for iPhone notch/home bar */
   body {
     padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /* Prevent text size adjustment on mobile */
