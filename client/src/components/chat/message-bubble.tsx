@@ -1,7 +1,7 @@
-import { memo } from "react";
+import { memo, useState, useCallback } from "react";
 import { UIMessage } from "@/hooks/use-chat";
 import { MarkdownRenderer } from "./markdown-renderer";
-import { Bot, User } from "lucide-react";
+import { Bot, User, Volume2, VolumeX } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -9,8 +9,52 @@ interface MessageBubbleProps {
   message: UIMessage;
 }
 
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/!\[.*?\]\(.*?\)/g, "imagen generada")
+    .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
+    .replace(/#{1,6}\s/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/`{1,3}[^`]*`{1,3}/g, "")
+    .replace(/>\s.+/g, "")
+    .replace(/[-*+]\s/g, "")
+    .replace(/\n+/g, " ")
+    .trim();
+}
+
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speak = useCallback(() => {
+    if (!window.speechSynthesis) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const text = stripMarkdown(message.content);
+    const utterance = new SpeechSynthesisUtterance(text);
+
+    const voices = window.speechSynthesis.getVoices();
+    const spanishVoice = voices.find(
+      (v) => v.lang.startsWith("es") || v.name.toLowerCase().includes("spanish")
+    );
+    if (spanishVoice) utterance.voice = spanishVoice;
+
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.speak(utterance);
+  }, [message.content, isSpeaking]);
 
   return (
     <motion.div
@@ -19,7 +63,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
       className={`flex w-full ${isUser ? "justify-end" : "justify-start"} mb-6`}
     >
       <div className={`flex gap-4 max-w-[85%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-        
+
         {/* Avatar */}
         <div className="flex-shrink-0 pt-1">
           {isUser ? (
@@ -38,11 +82,11 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         </div>
 
         {/* Bubble */}
-        <div 
+        <div
           className={`
             px-5 py-4 rounded-2xl relative
-            ${isUser 
-              ? "bg-primary text-primary-foreground rounded-tr-sm shadow-sm" 
+            ${isUser
+              ? "bg-primary text-primary-foreground rounded-tr-sm shadow-sm"
               : "bg-card border border-border shadow-sm shadow-black/5 rounded-tl-sm"
             }
           `}
@@ -56,6 +100,34 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
           {/* Streaming Indicator */}
           {message.isStreaming && (
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
+          )}
+
+          {/* Speaker button — only on assistant messages, not while streaming */}
+          {!isUser && !message.isStreaming && (
+            <button
+              onClick={speak}
+              data-testid="button-speak-message"
+              className={`
+                mt-2 flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors
+                ${isSpeaking
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }
+              `}
+              title={isSpeaking ? "Detener" : "Escuchar respuesta"}
+            >
+              {isSpeaking ? (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  <span>Detener</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>Escuchar</span>
+                </>
+              )}
+            </button>
           )}
         </div>
       </div>
