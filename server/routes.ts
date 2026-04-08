@@ -221,8 +221,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         model: "gpt-image-1",
         prompt,
         n: 1,
-        size: "1024x1024",
-      });
+        size: "1536x1024",
+        quality: "high",
+      } as any);
 
       const imageBase64 = response.data[0]?.b64_json;
       if (!imageBase64) return res.status(500).json({ error: "No se pudo generar la imagen" });
