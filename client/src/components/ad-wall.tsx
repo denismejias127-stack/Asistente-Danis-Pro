@@ -34,7 +34,7 @@ const ADS = [
   },
 ];
 
-const AD_DURATION = 5;
+const AD_DURATION = 3;
 
 export function AdWall({ onSuccess }: AdWallProps) {
   const [adIndex, setAdIndex] = useState(0);
