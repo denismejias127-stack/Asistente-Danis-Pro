@@ -6,14 +6,13 @@ import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
-import { Sparkles, Image as ImageIcon, Video, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, Image as ImageIcon, Video } from "lucide-react";
+import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateConversation } from "@/hooks/use-conversations";
 import { useLocation } from "wouter";
-import { AdWall } from "@/components/ad-wall";
 
 type GenMode = "chat" | "image" | "video";
 
@@ -32,7 +31,6 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
-  const [showAdWall, setShowAdWall] = useState(false);
 
   const searchParams = new URLSearchParams(search);
   const mode: GenMode = (searchParams.get("mode") as GenMode) || "chat";
@@ -67,11 +65,7 @@ export default function ChatPage() {
     }
 
     if (mode === "video") {
-      if (!user?.isPro) {
-        setShowAdWall(true);
-        return;
-      }
-      toast({ title: "Generando video...", description: "Esto puede tardar unos minutos." });
+      toast({ title: "Próximamente", description: "La generación de video estará disponible muy pronto." });
       return;
     }
 
@@ -167,9 +161,7 @@ export default function ChatPage() {
               {mode === "image"
                 ? "Describe con detalle la imagen que quieres y la genero en segundos."
                 : mode === "video"
-                ? user?.isPro
-                  ? "Describe el video y lo genero para ti."
-                  : "Ve 3 anuncios rápidos para desbloquear la generación de videos gratis."
+                ? "Describe el video que quieres crear."
                 : "Puedo responder preguntas, escribir código, ayudarte a crear contenido y más."}
             </motion.p>
           </div>
@@ -201,42 +193,6 @@ export default function ChatPage() {
           mode={mode}
         />
       </div>
-
-      {/* Ad Wall Modal */}
-      <AnimatePresence>
-        {showAdWall && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-card border border-border rounded-3xl p-6 max-w-sm w-full shadow-2xl relative"
-              data-testid="modal-ad-wall"
-            >
-              <button
-                onClick={() => setShowAdWall(false)}
-                className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-                data-testid="button-close-adwall"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="flex flex-col items-center text-center gap-2 mb-4">
-                <Video className="w-8 h-8 text-blue-500" />
-                <h3 className="text-xl font-bold">Desbloquear Modo Video</h3>
-              </div>
-
-              <AdWall onSuccess={() => setShowAdWall(false)} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
