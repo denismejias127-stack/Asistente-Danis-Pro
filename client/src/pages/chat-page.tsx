@@ -81,7 +81,7 @@ export default function ChatPage() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`/api/video-task/${taskId}`, { credentials: "include" });
+        const res = await fetch(`/api/video-task?taskId=${encodeURIComponent(taskId)}`, { credentials: "include" });
         const data = await res.json();
 
         if (data.status === "SUCCEEDED" && data.videoUrl) {

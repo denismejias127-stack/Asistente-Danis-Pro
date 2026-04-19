@@ -338,7 +338,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ── Video Generation ────────────────────────────────────────────────────────
+  // ── Video Generation (Gemini Veo) ──────────────────────────────────────────
   app.post("/api/generate-video", async (req, res) => {
     const userId = requireUser(req, res);
     if (!userId) return;
@@ -346,35 +346,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Se requiere un prompt" });
 
-    const apiKey = process.env.RUNWAY_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return res.status(503).json({ error: "La generación de video no está configurada aún." });
+      return res.status(503).json({ error: "La generación de video no está configurada. Se necesita una clave de Gemini API." });
     }
 
     try {
-      const response = await fetch("https://api.runwayml.com/v1/text_to_video", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "X-Runway-Version": "2024-11-06",
-        },
-        body: JSON.stringify({
-          model: "gen4_turbo",
-          promptText: prompt,
-          duration: 5,
-          ratio: "1280:720",
-        }),
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/veo-2.0-generate-001:predictLongRunning?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            instances: [{ prompt }],
+            parameters: {
+              aspectRatio: "16:9",
+              durationSeconds: 8,
+              sampleCount: 1,
+            },
+          }),
+        }
+      );
 
       if (!response.ok) {
         const body = await response.text();
-        console.error("Runway error:", response.status, body);
+        console.error("Gemini Veo error:", response.status, body);
         return res.status(500).json({ error: "Error al iniciar la generación de video" });
       }
 
-      const task = await response.json() as any;
-      res.json({ taskId: task.id });
+      const data = await response.json() as any;
+      const operationName = data.name;
+      if (!operationName) {
+        console.error("No operation name:", JSON.stringify(data).slice(0, 300));
+        return res.status(500).json({ error: "Respuesta inesperada del servidor de video" });
+      }
+      res.json({ taskId: operationName });
     } catch (error) {
       console.error("Video gen error:", error);
       res.status(500).json({ error: "Error al generar el video" });
@@ -398,30 +404,58 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // ── Video Task Status ────────────────────────────────────────────────────────
-  app.get("/api/video-task/:taskId", async (req, res) => {
+  // ── Video Task Status (Gemini Veo) ─────────────────────────────────────────
+  app.get("/api/video-task", async (req, res) => {
     const userId = requireUser(req, res);
     if (!userId) return;
 
-    const { taskId } = req.params;
-    const apiKey = process.env.RUNWAY_API_KEY;
+    const taskId = req.query.taskId as string;
+    if (!taskId) return res.status(400).json({ error: "taskId requerido" });
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return res.status(503).json({ error: "No configurado" });
 
     try {
-      const response = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`,
-          "X-Runway-Version": "2024-11-06",
-        },
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/${taskId}?key=${apiKey}`
+      );
 
       if (!response.ok) {
+        const body = await response.text();
+        console.error("Poll error:", response.status, body.slice(0, 200));
         return res.status(500).json({ error: "Error consultando el estado del video" });
       }
 
-      const task = await response.json() as any;
-      const videoUrl = task.status === "SUCCEEDED" ? (task.output?.[0] || null) : null;
-      res.json({ status: task.status, videoUrl, progress: task.progress ?? null });
+      const data = await response.json() as any;
+
+      if (!data.done) {
+        return res.json({ status: "RUNNING", videoUrl: null });
+      }
+
+      if (data.error) {
+        console.error("Veo operation failed:", data.error);
+        return res.json({ status: "FAILED", videoUrl: null });
+      }
+
+      const samples =
+        data.response?.generateVideoResponse?.generatedSamples ||
+        data.response?.generatedSamples ||
+        [];
+
+      if (!samples.length) {
+        console.error("No samples:", JSON.stringify(data).slice(0, 300));
+        return res.json({ status: "FAILED", videoUrl: null });
+      }
+
+      const videoData = samples[0]?.video;
+      let videoUrl: string | null = null;
+
+      if (videoData?.uri) {
+        videoUrl = videoData.uri;
+      } else if (videoData?.bytesBase64Encoded) {
+        videoUrl = `data:video/mp4;base64,${videoData.bytesBase64Encoded}`;
+      }
+
+      res.json({ status: "SUCCEEDED", videoUrl });
     } catch (error) {
       console.error("Video task poll error:", error);
       res.status(500).json({ error: "Error consultando el video" });
