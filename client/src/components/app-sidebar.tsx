@@ -68,7 +68,7 @@ export function AppSidebar() {
             data-testid="button-video-mode"
           >
             <Video className="w-3.5 h-3.5" />
-            Video {!user?.isPro && <Crown className="w-3 h-3 text-yellow-500" />}
+            Video
           </Button>
         </div>
       </SidebarHeader>

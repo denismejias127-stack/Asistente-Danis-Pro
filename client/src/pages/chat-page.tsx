@@ -65,7 +65,7 @@ export default function ChatPage() {
     }
 
     if (mode === "video") {
-      toast({ title: "Próximamente", description: "La generación de video estará disponible muy pronto." });
+      sendMessage(`[Solicitud de video]: ${content}`);
       return;
     }
 
