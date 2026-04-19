@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useRoute, useSearch } from "wouter";
 import { useConversation } from "@/hooks/use-conversations";
 import { useChatStream, UIMessage } from "@/hooks/use-chat";
@@ -31,6 +31,8 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const searchParams = new URLSearchParams(search);
   const mode: GenMode = (searchParams.get("mode") as GenMode) || "chat";
@@ -39,7 +41,13 @@ export default function ChatPage() {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [conversationData?.messages, streamingContent, optimisticUserMsg]);
+  }, [conversationData?.messages, streamingContent, optimisticUserMsg, videoStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const messages: UIMessage[] = [
     ...(conversationData?.messages || []).map((m) => ({
@@ -58,6 +66,48 @@ export default function ChatPage() {
 
   const isInitialEmpty = !conversationId && messages.length === 0;
 
+  const saveMessage = useCallback(async (convId: number, role: string, content: string) => {
+    await fetch(`/api/conversations/${convId}/save-message`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ role, content }),
+    });
+    queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, convId] });
+    queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
+  }, [queryClient]);
+
+  const pollVideoTask = useCallback((taskId: string, convId: number) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/video-task/${taskId}`, { credentials: "include" });
+        const data = await res.json();
+
+        if (data.status === "SUCCEEDED" && data.videoUrl) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          await saveMessage(convId, "assistant", `[VIDEO]:${data.videoUrl}`);
+          setIsGeneratingMedia(false);
+          setVideoStatus(null);
+        } else if (data.status === "FAILED") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          await saveMessage(convId, "assistant", "Lo siento, no pude generar el video. Por favor intenta de nuevo.");
+          setIsGeneratingMedia(false);
+          setVideoStatus(null);
+          toast({ title: "Error", description: "No se pudo generar el video.", variant: "destructive" });
+        } else {
+          const progress = data.progress ? ` (${Math.round(data.progress * 100)}%)` : "";
+          setVideoStatus(`Generando video${progress}...`);
+        }
+      } catch {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setIsGeneratingMedia(false);
+        setVideoStatus(null);
+        toast({ title: "Error", description: "Error al verificar el estado del video.", variant: "destructive" });
+      }
+    }, 5000);
+  }, [saveMessage, toast]);
+
   const handleSend = async (content: string) => {
     if (mode === "chat") {
       sendMessage(content);
@@ -65,7 +115,41 @@ export default function ChatPage() {
     }
 
     if (mode === "video") {
-      sendMessage(`[Solicitud de video]: ${content}`);
+      setIsGeneratingMedia(true);
+      setVideoStatus("Iniciando generación de video...");
+      try {
+        let targetConvId = conversationId;
+        if (!targetConvId) {
+          const newConv = await createConv.mutateAsync();
+          targetConvId = newConv.id;
+          setLocation(`/c/${newConv.id}?mode=video`);
+        }
+
+        await saveMessage(targetConvId, "user", `🎬 Generar video: ${content}`);
+
+        const res = await fetch("/api/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ prompt: content }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          await saveMessage(targetConvId, "assistant", data.error || "Error al generar el video.");
+          setIsGeneratingMedia(false);
+          setVideoStatus(null);
+          return;
+        }
+
+        setVideoStatus("Video en proceso, esto puede tomar 1-2 minutos...");
+        pollVideoTask(data.taskId, targetConvId);
+      } catch {
+        toast({ title: "Error", description: "No se pudo iniciar la generación de video.", variant: "destructive" });
+        setIsGeneratingMedia(false);
+        setVideoStatus(null);
+      }
       return;
     }
 
@@ -161,7 +245,7 @@ export default function ChatPage() {
               {mode === "image"
                 ? "Describe con detalle la imagen que quieres y la genero en segundos."
                 : mode === "video"
-                ? "Describe el video que quieres crear."
+                ? "Describe el video que quieres y lo genero con IA (tarda 1-2 minutos)."
                 : "Puedo responder preguntas, escribir código, ayudarte a crear contenido y más."}
             </motion.p>
           </div>
@@ -176,8 +260,10 @@ export default function ChatPage() {
             )}
             {isGeneratingMedia && (
               <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border">
-                <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm text-muted-foreground">Generando {mode === "image" ? "imagen" : "video"}...</span>
+                <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                <span className="text-sm text-muted-foreground">
+                  {videoStatus || (mode === "image" ? "Generando imagen..." : "Generando...")}
+                </span>
               </div>
             )}
           </div>

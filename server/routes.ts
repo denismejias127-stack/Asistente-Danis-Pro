@@ -342,11 +342,90 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/generate-video", async (req, res) => {
     const userId = requireUser(req, res);
     if (!userId) return;
-    const user = await storage.getUser(userId);
-    if (!user?.isPro) {
-      return res.status(403).json({ error: "Requiere acceso Pro", requiresUpgrade: true });
+
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Se requiere un prompt" });
+
+    const apiKey = process.env.RUNWAY_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ error: "La generación de video no está configurada aún." });
     }
-    res.status(503).json({ error: "Generación de video próximamente." });
+
+    try {
+      const response = await fetch("https://api.runwayml.com/v1/text_to_video", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "X-Runway-Version": "2024-11-06",
+        },
+        body: JSON.stringify({
+          model: "gen4_turbo",
+          promptText: prompt,
+          duration: 5,
+          ratio: "1280:720",
+        }),
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error("Runway error:", response.status, body);
+        return res.status(500).json({ error: "Error al iniciar la generación de video" });
+      }
+
+      const task = await response.json() as any;
+      res.json({ taskId: task.id });
+    } catch (error) {
+      console.error("Video gen error:", error);
+      res.status(500).json({ error: "Error al generar el video" });
+    }
+  });
+
+  // ── Save direct message ────────────────────────────────────────────────────
+  app.post(api.messages.save.path, async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+    try {
+      const id = parseInt(req.params.id);
+      const { role, content } = req.body;
+      if (!role || !content) return res.status(400).json({ error: "role y content son requeridos" });
+      const conv = await storage.getConversation(id, userId);
+      if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
+      const message = await storage.createMessage(id, role, content);
+      res.status(201).json(message);
+    } catch {
+      res.status(500).json({ error: "Error al guardar el mensaje" });
+    }
+  });
+
+  // ── Video Task Status ────────────────────────────────────────────────────────
+  app.get("/api/video-task/:taskId", async (req, res) => {
+    const userId = requireUser(req, res);
+    if (!userId) return;
+
+    const { taskId } = req.params;
+    const apiKey = process.env.RUNWAY_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: "No configurado" });
+
+    try {
+      const response = await fetch(`https://api.runwayml.com/v1/tasks/${taskId}`, {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "X-Runway-Version": "2024-11-06",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(500).json({ error: "Error consultando el estado del video" });
+      }
+
+      const task = await response.json() as any;
+      const videoUrl = task.status === "SUCCEEDED" ? (task.output?.[0] || null) : null;
+      res.json({ status: task.status, videoUrl, progress: task.progress ?? null });
+    } catch (error) {
+      console.error("Video task poll error:", error);
+      res.status(500).json({ error: "Error consultando el video" });
+    }
   });
 
   return httpServer;

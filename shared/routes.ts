@@ -57,6 +57,14 @@ export const api = {
         // SSE responses handled manually
         200: z.any()
       }
+    },
+    save: {
+      method: 'POST' as const,
+      path: '/api/conversations/:id/save-message' as const,
+      input: z.object({ role: z.string(), content: z.string() }),
+      responses: {
+        201: z.custom<typeof messages.$inferSelect>(),
+      }
     }
   }
 };

@@ -23,9 +23,26 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
+function VideoMessage({ url }: { url: string }) {
+  return (
+    <div className="mt-1">
+      <video
+        src={url}
+        controls
+        className="rounded-xl max-w-full w-full max-h-80 bg-black"
+        data-testid="video-generated"
+      />
+      <p className="text-xs text-muted-foreground mt-1 text-center">Video generado por IA</p>
+    </div>
+  );
+}
+
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const isVideoMessage = !isUser && message.content.startsWith("[VIDEO]:");
+  const videoUrl = isVideoMessage ? message.content.replace("[VIDEO]:", "").trim() : null;
 
   const speak = useCallback(() => {
     if (!window.speechSynthesis) return;
@@ -93,6 +110,8 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         >
           {isUser ? (
             <p className="whitespace-pre-wrap leading-relaxed text-[0.95rem]">{message.content}</p>
+          ) : isVideoMessage && videoUrl ? (
+            <VideoMessage url={videoUrl} />
           ) : (
             <MarkdownRenderer content={message.content} />
           )}
@@ -102,8 +121,8 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
           )}
 
-          {/* Speaker button — only on assistant messages, not while streaming */}
-          {!isUser && !message.isStreaming && (
+          {/* Speaker button — only on assistant messages, not while streaming, not on videos */}
+          {!isUser && !message.isStreaming && !isVideoMessage && (
             <button
               onClick={speak}
               data-testid="button-speak-message"
