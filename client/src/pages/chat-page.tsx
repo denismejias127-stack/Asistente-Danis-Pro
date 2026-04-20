@@ -143,6 +143,16 @@ export default function ChatPage() {
           return;
         }
 
+        // If video already ready (fast response)
+        if (data.status === "SUCCEEDED" && data.videoUrl) {
+          await saveMessage(targetConvId, "assistant", `[VIDEO]:${data.videoUrl}`);
+          queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, targetConvId] });
+          queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
+          setIsGeneratingMedia(false);
+          setVideoStatus(null);
+          return;
+        }
+
         setVideoStatus("Video en proceso, esto puede tomar 1-2 minutos...");
         pollVideoTask(data.taskId, targetConvId);
       } catch {
