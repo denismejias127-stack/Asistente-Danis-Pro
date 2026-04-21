@@ -135,19 +135,23 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
           )}
 
-          {/* Speaker button */}
-          {!isUser && !message.isStreaming && (
+          {/* Speaker button — on all messages (user and assistant), not while streaming */}
+          {!message.isStreaming && (
             <button
               onClick={speak}
               data-testid="button-speak-message"
               className={`
                 mt-2 flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors
                 ${isSpeaking
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  ? isUser
+                    ? "text-primary-foreground/80 bg-white/20"
+                    : "text-primary bg-primary/10"
+                  : isUser
+                    ? "text-primary-foreground/60 hover:text-primary-foreground/90 hover:bg-white/15"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }
               `}
-              title={isSpeaking ? "Detener" : "Escuchar respuesta"}
+              title={isSpeaking ? "Detener" : "Escuchar"}
             >
               {isSpeaking ? (
                 <>
