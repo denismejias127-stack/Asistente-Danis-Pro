@@ -1,7 +1,7 @@
-import { memo, useState, useCallback } from "react";
+import { memo, useState, useCallback, useEffect } from "react";
 import { UIMessage } from "@/hooks/use-chat";
 import { MarkdownRenderer } from "./markdown-renderer";
-import { Bot, User, Volume2, VolumeX } from "lucide-react";
+import { Bot, User, Volume2, VolumeX, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -23,26 +23,28 @@ function stripMarkdown(text: string): string {
     .trim();
 }
 
-function VideoMessage({ url }: { url: string }) {
-  return (
-    <div className="mt-1">
-      <video
-        src={url}
-        controls
-        className="rounded-xl max-w-full w-full max-h-80 bg-black"
-        data-testid="video-generated"
-      />
-      <p className="text-xs text-muted-foreground mt-1 text-center">Video generado por IA</p>
-    </div>
-  );
+function parseOpenUrl(content: string): { cleanContent: string; url: string | null } {
+  const match = content.match(/\[OPEN_URL:(https?:\/\/[^\]]+)\]/);
+  if (!match) return { cleanContent: content, url: null };
+  const url = match[1].trim();
+  const cleanContent = content.replace(match[0], "").trim();
+  return { cleanContent, url };
 }
 
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [opened, setOpened] = useState(false);
 
-  const isVideoMessage = !isUser && message.content.startsWith("[VIDEO]:");
-  const videoUrl = isVideoMessage ? message.content.replace("[VIDEO]:", "").trim() : null;
+  const { cleanContent, url } = parseOpenUrl(message.content);
+
+  // Auto-open URL once when the message is complete (not streaming)
+  useEffect(() => {
+    if (!isUser && url && !message.isStreaming && !opened) {
+      setOpened(true);
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }, [isUser, url, message.isStreaming, opened]);
 
   const speak = useCallback(() => {
     if (!window.speechSynthesis) return;
@@ -53,7 +55,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
       return;
     }
 
-    const text = stripMarkdown(message.content);
+    const text = stripMarkdown(cleanContent);
     const utterance = new SpeechSynthesisUtterance(text);
 
     const voices = window.speechSynthesis.getVoices();
@@ -71,7 +73,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
     utterance.onerror = () => setIsSpeaking(false);
 
     window.speechSynthesis.speak(utterance);
-  }, [message.content, isSpeaking]);
+  }, [cleanContent, isSpeaking]);
 
   return (
     <motion.div
@@ -110,10 +112,22 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         >
           {isUser ? (
             <p className="whitespace-pre-wrap leading-relaxed text-[0.95rem]">{message.content}</p>
-          ) : isVideoMessage && videoUrl ? (
-            <VideoMessage url={videoUrl} />
           ) : (
-            <MarkdownRenderer content={message.content} />
+            <MarkdownRenderer content={cleanContent} />
+          )}
+
+          {/* Open URL indicator */}
+          {!isUser && url && !message.isStreaming && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors w-fit"
+              data-testid="link-open-url"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              {opened ? "Abrir de nuevo" : "Abrir aplicación"}
+            </a>
           )}
 
           {/* Streaming Indicator */}
@@ -121,8 +135,8 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
           )}
 
-          {/* Speaker button — only on assistant messages, not while streaming, not on videos */}
-          {!isUser && !message.isStreaming && !isVideoMessage && (
+          {/* Speaker button */}
+          {!isUser && !message.isStreaming && (
             <button
               onClick={speak}
               data-testid="button-speak-message"
