@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder, useVoiceStream } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLocation } from "wouter";
+import { ChatModel } from "@/hooks/use-chat";
 
 type GenMode = "chat" | "image";
 
@@ -14,9 +15,53 @@ interface ChatInputProps {
   isGenerating: boolean;
   conversationId?: number;
   mode?: GenMode;
+  chatModel?: ChatModel;
+  onModelChange?: (model: ChatModel) => void;
 }
 
-export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" }: ChatInputProps) {
+const MODEL_OPTIONS: { key: ChatModel; label: string; icon: React.ElementType; description: string; color: string; activeClass: string }[] = [
+  {
+    key: "fast",
+    label: "Rápido",
+    icon: Zap,
+    description: "Respuestas instantáneas",
+    color: "text-yellow-500",
+    activeClass: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300",
+  },
+  {
+    key: "normal",
+    label: "Normal",
+    icon: MessageSquare,
+    description: "Equilibrado",
+    color: "text-primary",
+    activeClass: "bg-primary/10 text-primary",
+  },
+  {
+    key: "think",
+    label: "Pensar",
+    icon: Brain,
+    description: "Razonamiento profundo",
+    color: "text-blue-500",
+    activeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  },
+  {
+    key: "pro",
+    label: "Pro",
+    icon: Star,
+    description: "Máxima calidad",
+    color: "text-purple-500",
+    activeClass: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+  },
+];
+
+export function ChatInput({
+  onSend,
+  isGenerating,
+  conversationId,
+  mode = "chat",
+  chatModel = "normal",
+  onModelChange,
+}: ChatInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useVoiceRecorder();
@@ -65,44 +110,94 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
     }
   };
 
+  const activeModel = MODEL_OPTIONS.find((m) => m.key === chatModel) || MODEL_OPTIONS[1];
+
   const placeholder =
     mode === "image"
       ? "Describe la imagen que quieres generar..."
       : recorder.state === "recording"
       ? "Escuchando..."
+      : chatModel === "fast"
+      ? "Respuesta rápida..."
+      : chatModel === "think"
+      ? "Hazme una pregunta difícil..."
+      : chatModel === "pro"
+      ? "Pregunta lo que quieras..."
       : "Escribe un mensaje...";
 
-  const modeColor = mode === "image" ? "ring-purple-500/20 border-purple-500/20" : "";
+  const sendBtnColor =
+    mode === "image"
+      ? "bg-purple-600 hover:bg-purple-700"
+      : chatModel === "fast"
+      ? "bg-yellow-500 hover:bg-yellow-600"
+      : chatModel === "think"
+      ? "bg-blue-600 hover:bg-blue-700"
+      : chatModel === "pro"
+      ? "bg-purple-600 hover:bg-purple-700"
+      : "";
 
   return (
     <div className="relative p-4 md:p-6 pb-6 md:pb-8 w-full max-w-4xl mx-auto">
-      {/* Mode switcher */}
-      <div className="flex items-center gap-1 mb-2 ml-1">
-        {[
-          { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
-          { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
-        ].map(({ key, icon: Icon, label }) => (
-          <button
-            key={key}
-            onClick={() => setLocation(key === "chat" ? "/" : `/?mode=${key}`)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              mode === key
-                ? key === "image"
-                  ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                  : "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-            data-testid={`button-mode-${key}`}
-          >
-            <Icon className="w-3 h-3" />
-            {label}
-          </button>
-        ))}
+      {/* Top row: Gen mode + Model switcher */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        {/* Gen mode (Chat / Imagen) */}
+        <div className="flex items-center gap-1">
+          {[
+            { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
+            { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
+          ].map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setLocation(key === "chat" ? "/" : `/?mode=${key}`)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                mode === key
+                  ? key === "image"
+                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                    : "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`button-mode-${key}`}
+            >
+              <Icon className="w-3 h-3" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Speed/Model selector — only in chat mode */}
+        {mode === "chat" && (
+          <div className="flex items-center gap-0.5 bg-muted/50 rounded-full p-0.5">
+            {MODEL_OPTIONS.map(({ key, label, icon: Icon, activeClass }) => (
+              <button
+                key={key}
+                onClick={() => onModelChange?.(key)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                  chatModel === key
+                    ? activeClass
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                title={MODEL_OPTIONS.find((m) => m.key === key)?.description}
+                data-testid={`button-model-${key}`}
+              >
+                <Icon className="w-3 h-3" />
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div
         className={`relative flex items-end w-full glass-panel rounded-[1.5rem] shadow-lg shadow-black/5 p-2 transition-all focus-within:ring-2 ${
-          modeColor || "focus-within:ring-primary/20 focus-within:border-primary/30"
+          chatModel === "fast"
+            ? "focus-within:ring-yellow-500/20 focus-within:border-yellow-500/20"
+            : chatModel === "think"
+            ? "focus-within:ring-blue-500/20 focus-within:border-blue-500/20"
+            : chatModel === "pro"
+            ? "focus-within:ring-purple-500/20 focus-within:border-purple-500/20"
+            : mode === "image"
+            ? "focus-within:ring-purple-500/20 focus-within:border-purple-500/20"
+            : "focus-within:ring-primary/20 focus-within:border-primary/30"
         }`}
       >
         <Textarea
@@ -144,9 +239,9 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
           <Button
             type="button"
             size="icon"
-            className={`rounded-full w-10 h-10 transition-all duration-300 ${
-              mode === "image" ? "bg-purple-600 hover:bg-purple-700" : ""
-            } ${input.trim() || isGenerating ? "opacity-100 scale-100" : "opacity-50 scale-95"}`}
+            className={`rounded-full w-10 h-10 transition-all duration-300 ${sendBtnColor} ${
+              input.trim() || isGenerating ? "opacity-100 scale-100" : "opacity-50 scale-95"
+            }`}
             disabled={(!input.trim() && !isGenerating) || recorder.state === "recording"}
             onClick={(e) => { e.preventDefault(); handleSend(); }}
             data-testid="button-send"
@@ -160,9 +255,18 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
         </div>
       </div>
 
-      <div className="text-center mt-3 text-xs text-muted-foreground/70 px-4">
-        La IA puede cometer errores. Verifica la información importante.
-      </div>
+      {/* Model description hint */}
+      {mode === "chat" && (
+        <div className="text-center mt-2 text-xs text-muted-foreground/70 px-4 flex items-center justify-center gap-1">
+          <activeModel.icon className={`w-3 h-3 ${activeModel.color}`} />
+          <span>{activeModel.description} · La IA puede cometer errores.</span>
+        </div>
+      )}
+      {mode !== "chat" && (
+        <div className="text-center mt-3 text-xs text-muted-foreground/70 px-4">
+          La IA puede cometer errores. Verifica la información importante.
+        </div>
+      )}
     </div>
   );
 }

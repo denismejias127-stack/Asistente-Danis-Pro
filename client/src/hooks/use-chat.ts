@@ -13,6 +13,8 @@ export type UIMessage = {
   isStreaming?: boolean;
 };
 
+export type ChatModel = "fast" | "normal" | "think" | "pro";
+
 export function useChatStream(conversationId?: number) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -23,7 +25,7 @@ export function useChatStream(conversationId?: number) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, model: ChatModel = "normal") => {
     if (!content.trim() || isGenerating) return;
 
     setIsGenerating(true);
@@ -46,7 +48,7 @@ export function useChatStream(conversationId?: number) {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, model }),
       });
 
       if (!response.ok) {

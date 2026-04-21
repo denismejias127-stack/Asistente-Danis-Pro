@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useRoute, useSearch } from "wouter";
 import { useConversation } from "@/hooks/use-conversations";
-import { useChatStream, UIMessage } from "@/hooks/use-chat";
+import { useChatStream, UIMessage, ChatModel } from "@/hooks/use-chat";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
@@ -31,6 +31,7 @@ export default function ChatPage() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+  const [chatModel, setChatModel] = useState<ChatModel>("normal");
 
   const searchParams = new URLSearchParams(search);
   const mode: GenMode = (searchParams.get("mode") as GenMode) || "chat";
@@ -60,7 +61,7 @@ export default function ChatPage() {
 
   const handleSend = async (content: string) => {
     if (mode === "chat") {
-      sendMessage(content);
+      sendMessage(content, chatModel);
       return;
     }
 
@@ -176,6 +177,8 @@ export default function ChatPage() {
           isGenerating={isGenerating || isGeneratingMedia}
           conversationId={conversationId}
           mode={mode}
+          chatModel={chatModel}
+          onModelChange={setChatModel}
         />
       </div>
     </div>

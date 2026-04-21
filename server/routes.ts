@@ -157,8 +157,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!userId) return;
     try {
       const conversationId = parseInt(req.params.id);
-      const { content } = req.body;
+      const { content, model: modelKey } = req.body;
       if (!content) return res.status(400).json({ error: "El contenido es requerido" });
+
+      const MODEL_MAP: Record<string, string> = {
+        fast:  "gpt-4o-mini",
+        normal: "gpt-4o",
+        think: "o4-mini",
+        pro:   "gpt-5.2",
+      };
+      const model = MODEL_MAP[modelKey] || "gpt-4o";
 
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
@@ -171,7 +179,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Connection", "keep-alive");
 
       const stream = await openai.chat.completions.create({
-        model: "gpt-5.2",
+        model,
         messages: [
           {
             role: "system",
