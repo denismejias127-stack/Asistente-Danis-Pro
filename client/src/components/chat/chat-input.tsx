@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Video } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder, useVoiceStream } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLocation } from "wouter";
 
-type GenMode = "chat" | "image" | "video";
+type GenMode = "chat" | "image";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -68,18 +68,11 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
   const placeholder =
     mode === "image"
       ? "Describe la imagen que quieres generar..."
-      : mode === "video"
-      ? "Describe el video que quieres generar..."
       : recorder.state === "recording"
       ? "Escuchando..."
       : "Escribe un mensaje...";
 
-  const modeColor =
-    mode === "image"
-      ? "ring-purple-500/20 border-purple-500/20"
-      : mode === "video"
-      ? "ring-blue-500/20 border-blue-500/20"
-      : "";
+  const modeColor = mode === "image" ? "ring-purple-500/20 border-purple-500/20" : "";
 
   return (
     <div className="relative p-4 md:p-6 pb-6 md:pb-8 w-full max-w-4xl mx-auto">
@@ -88,7 +81,6 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
         {[
           { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
           { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
-          { key: "video" as GenMode, icon: Video, label: "Video" },
         ].map(({ key, icon: Icon, label }) => (
           <button
             key={key}
@@ -97,8 +89,6 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
               mode === key
                 ? key === "image"
                   ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                  : key === "video"
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
                   : "bg-primary/10 text-primary"
                 : "text-muted-foreground hover:text-foreground"
             }`}
@@ -155,11 +145,7 @@ export function ChatInput({ onSend, isGenerating, conversationId, mode = "chat" 
             type="button"
             size="icon"
             className={`rounded-full w-10 h-10 transition-all duration-300 ${
-              mode === "image"
-                ? "bg-purple-600 hover:bg-purple-700"
-                : mode === "video"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : ""
+              mode === "image" ? "bg-purple-600 hover:bg-purple-700" : ""
             } ${input.trim() || isGenerating ? "opacity-100 scale-100" : "opacity-50 scale-95"}`}
             disabled={(!input.trim() && !isGenerating) || recorder.state === "recording"}
             onClick={(e) => { e.preventDefault(); handleSend(); }}
