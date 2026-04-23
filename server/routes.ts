@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { registerAudioRoutes } from "./replit_integrations/audio/routes";
+import { registerLiveChatRoutes } from "./live-chat";
 import OpenAI from "openai";
 
 // Extend session type
@@ -65,6 +66,7 @@ function getPayPalBase() {
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   registerAudioRoutes(app);
+  registerLiveChatRoutes(app);
 
   // ── Email Login (no password) ───────────────────────────────────────────────
   app.post("/api/auth/email-login", async (req, res) => {

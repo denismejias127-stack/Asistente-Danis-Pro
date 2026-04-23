@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import ChatPage from "@/pages/chat-page";
+import LivePage from "@/pages/live-page";
 import LoginPage from "@/pages/login";
 
 function AppContent() {
@@ -32,6 +33,7 @@ function AppContent() {
         <Switch>
           <Route path="/" component={ChatPage} />
           <Route path="/c/:id" component={ChatPage} />
+          <Route path="/live" component={LivePage} />
           <Route component={NotFound} />
         </Switch>
       </div>
