@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
@@ -238,6 +238,19 @@ export function ChatInput({
         />
 
         <div className="flex-shrink-0 flex items-center ml-2 mb-1 mr-1 gap-1">
+          {mode === "chat" && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="rounded-full w-10 h-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+              onClick={(e) => { e.preventDefault(); setLocation("/live"); }}
+              title="Iniciar chat en vivo (cámara + voz)"
+              data-testid="button-start-live"
+            >
+              <Video className="w-5 h-5" />
+            </Button>
+          )}
           {mode === "chat" && (
             <Button
               type="button"
