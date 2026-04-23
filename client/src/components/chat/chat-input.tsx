@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
-import { useVoiceRecorder, useVoiceStream } from "../../../replit_integrations/audio";
+import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { ChatModel } from "@/hooks/use-chat";
 
 type GenMode = "chat" | "image";
@@ -48,16 +49,8 @@ export function ChatInput({
   const recorder = useVoiceRecorder();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-
-  const voiceStream = useVoiceStream({
-    onUserTranscript: () => {},
-    onComplete: () => {
-      if (conversationId) {
-        queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, conversationId] });
-        queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
-      }
-    },
-  });
+  const { toast } = useToast();
+  const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -71,12 +64,38 @@ export function ChatInput({
   }, []);
 
   const handleVoiceToggle = async () => {
-    if (!conversationId) return;
     if (recorder.state === "recording") {
-      const blob = await recorder.stopRecording();
-      await voiceStream.streamVoiceResponse(`/api/conversations/${conversationId}/voice-messages`, blob);
+      setIsTranscribing(true);
+      try {
+        const blob = await recorder.stopRecording();
+        const base64 = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onload = () => resolve((r.result as string).split(",")[1]);
+          r.readAsDataURL(blob);
+        });
+        const res = await fetch("/api/transcribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ audio: base64 }),
+        });
+        if (!res.ok) throw new Error("transcribe failed");
+        const { text } = await res.json();
+        if (text) {
+          setInput((prev) => (prev ? prev + " " + text : text));
+          textareaRef.current?.focus();
+        }
+      } catch {
+        toast({ title: "Error", description: "No se pudo transcribir el audio.", variant: "destructive" });
+      } finally {
+        setIsTranscribing(false);
+      }
     } else {
-      await recorder.startRecording();
+      try {
+        await recorder.startRecording();
+      } catch {
+        toast({ title: "Sin micrófono", description: "Permite el acceso al micrófono en tu navegador.", variant: "destructive" });
+      }
     }
   };
 
@@ -230,11 +249,13 @@ export function ChatInput({
                   : "text-muted-foreground"
               }`}
               onClick={(e) => { e.preventDefault(); handleVoiceToggle(); }}
-              disabled={isGenerating || (!conversationId && input.length === 0)}
-              title={recorder.state === "recording" ? "Detener grabación" : "Grabar mensaje de voz"}
+              disabled={isGenerating || isTranscribing}
+              title={recorder.state === "recording" ? "Detener dictado" : "Dictar mensaje por voz"}
               data-testid="button-voice"
             >
-              {recorder.state === "recording" ? (
+              {isTranscribing ? (
+                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : recorder.state === "recording" ? (
                 <Square className="w-5 h-5 fill-current" />
               ) : (
                 <Mic className="w-5 h-5" />

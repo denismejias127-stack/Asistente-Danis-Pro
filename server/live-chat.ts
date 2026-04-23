@@ -13,6 +13,23 @@ const liveBodyParser = express.json({ limit: "50mb" });
 type LiveTurn = { role: "user" | "assistant"; content: string };
 
 export function registerLiveChatRoutes(app: Express) {
+  // Speech-to-text only (dictation for text chat)
+  app.post("/api/transcribe", liveBodyParser, async (req, res) => {
+    const userId = (req as any).session?.userId;
+    if (!userId) return res.status(401).json({ error: "No autenticado" });
+    try {
+      const { audio } = req.body as { audio: string };
+      if (!audio) return res.status(400).json({ error: "Falta el audio" });
+      const rawBuffer = Buffer.from(audio, "base64");
+      const { buffer, format } = await ensureCompatibleFormat(rawBuffer);
+      const text = (await speechToText(buffer, format)).trim();
+      res.json({ text });
+    } catch (e) {
+      console.error("Transcribe error:", e);
+      res.status(500).json({ error: "Error al transcribir" });
+    }
+  });
+
   app.post("/api/live-chat", liveBodyParser, async (req, res) => {
     const userId = (req as any).session?.userId;
     if (!userId) return res.status(401).json({ error: "No autenticado" });
