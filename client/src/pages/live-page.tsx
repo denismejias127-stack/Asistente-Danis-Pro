@@ -16,7 +16,8 @@ export default function LivePage() {
   const audioWorkletRef = useRef<AudioWorkletNode | null>(null);
   const historyRef = useRef<Turn[]>([]);
 
-  const [cameraOn, setCameraOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [streamReady, setStreamReady] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
@@ -25,33 +26,45 @@ export default function LivePage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Start camera/mic stream
-  const startStream = useCallback(async () => {
+  // Start camera/mic stream — only when explicitly requested
+  const startStream = useCallback(async (withVideo: boolean, face: "user" | "environment") => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: cameraOn ? { facingMode } : false,
+        video: withVideo ? { facingMode: face } : false,
         audio: true,
       });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
+      setStreamReady(true);
+      return stream;
     } catch (e: any) {
       toast({
         title: "Sin acceso a cámara/mic",
         description: "Activa los permisos en tu navegador.",
         variant: "destructive",
       });
+      return null;
     }
-  }, [cameraOn, facingMode, toast]);
+  }, [toast]);
+
+  // Restart stream when camera or facingMode changes (only if already initialized)
+  useEffect(() => {
+    if (streamReady) {
+      startStream(cameraOn, facingMode);
+    }
+    return () => {
+      // cleanup on unmount only
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraOn, facingMode]);
 
   useEffect(() => {
-    startStream();
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
       audioCtxRef.current?.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOn, facingMode]);
+  }, []);
 
   // Setup audio playback worklet
   const ensurePlayback = useCallback(async () => {
@@ -80,8 +93,10 @@ export default function LivePage() {
   }, [cameraOn]);
 
   const startRecording = useCallback(async () => {
-    if (!streamRef.current) await startStream();
-    const stream = streamRef.current;
+    let stream = streamRef.current;
+    if (!stream) {
+      stream = await startStream(cameraOn, facingMode);
+    }
     if (!stream) return;
     const audioStream = new MediaStream(stream.getAudioTracks());
     const recorder = new MediaRecorder(audioStream, { mimeType: "audio/webm;codecs=opus" });
@@ -95,7 +110,7 @@ export default function LivePage() {
     setStatus("listening");
     setUserText("");
     setAiText("");
-  }, [startStream]);
+  }, [startStream, cameraOn, facingMode]);
 
   const stopRecording = useCallback(async () => {
     const recorder = recorderRef.current;

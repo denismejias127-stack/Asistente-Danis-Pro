@@ -99,7 +99,7 @@ export default function ChatPage() {
     : null;
 
   return (
-    <div className="flex flex-col flex-1 h-screen bg-background relative overflow-hidden">
+    <div className="flex flex-col flex-1 h-[100dvh] bg-background overflow-hidden min-h-0">
       {/* Header */}
       <header className="flex-none flex items-center justify-between px-4 h-14 border-b border-border/50 bg-background/80 backdrop-blur-sm z-10">
         <div className="flex items-center gap-3">
@@ -117,7 +117,7 @@ export default function ChatPage() {
       </header>
 
       {/* Main Chat Area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto w-full flex flex-col">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto w-full flex flex-col">
         {isInitialEmpty ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto text-center">
             <motion.div
@@ -152,7 +152,7 @@ export default function ChatPage() {
             </motion.p>
           </div>
         ) : (
-          <div className="w-full max-w-4xl mx-auto p-4 md:p-6 pt-8 pb-32 flex flex-col min-h-full">
+          <div className="w-full max-w-4xl mx-auto p-4 md:p-6 pt-8 pb-6 flex flex-col min-h-full">
             {isLoading && conversationId ? (
               <div className="flex items-center justify-center flex-1">
                 <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -171,7 +171,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background to-transparent pt-10">
+      <div className="flex-none border-t border-border/50 bg-background">
         <ChatInput
           onSend={handleSend}
           isGenerating={isGenerating || isGeneratingMedia}
