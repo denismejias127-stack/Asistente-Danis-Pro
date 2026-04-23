@@ -49,6 +49,14 @@ export function AppSidebar() {
         </Button>
 
         {/* Mode shortcuts */}
+        <Button
+          onClick={() => setLocation("/live")}
+          className="w-full justify-start gap-2 bg-gradient-to-r from-red-500 to-pink-500 text-white hover:opacity-90"
+          data-testid="button-live-mode"
+        >
+          <Video className="w-4 h-4" />
+          Chat en vivo (cámara + voz)
+        </Button>
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -59,16 +67,6 @@ export function AppSidebar() {
           >
             <Image className="w-3.5 h-3.5" />
             Imagen
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={() => setLocation("/live")}
-            data-testid="button-live-mode"
-          >
-            <Video className="w-3.5 h-3.5" />
-            En vivo
           </Button>
         </div>
       </SidebarHeader>
