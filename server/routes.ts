@@ -159,8 +159,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!userId) return;
     try {
       const conversationId = parseInt(req.params.id);
-      const { content, model: modelKey } = req.body;
-      if (!content) return res.status(400).json({ error: "El contenido es requerido" });
+      const { content, model: modelKey, images } = req.body as { content: string; model?: string; images?: string[] };
+      const imgs: string[] = Array.isArray(images) ? images.filter((s) => typeof s === "string" && s.startsWith("data:image")) : [];
+      if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
       const MODEL_MAP: Record<string, string> = {
         fast:  "gpt-4o-mini",
@@ -168,12 +169,17 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         think: "o4-mini",
         pro:   "gpt-5.2",
       };
-      const model = MODEL_MAP[modelKey] || "gpt-4o";
+      // Vision-capable model required when images are attached; o4-mini doesn't accept images.
+      let model = MODEL_MAP[modelKey || "normal"] || "gpt-4o";
+      if (imgs.length > 0 && model === "o4-mini") model = "gpt-4o";
 
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
 
-      await storage.createMessage(conversationId, "user", content);
+      const persistedContent = imgs.length
+        ? `${content}${content ? "\n\n" : ""}${imgs.map((u) => `![](${u})`).join("\n")}`
+        : content;
+      await storage.createMessage(conversationId, "user", persistedContent);
       const chatMessages = await storage.getMessagesByConversation(conversationId);
 
       res.setHeader("Content-Type", "text/event-stream");
@@ -211,7 +217,19 @@ OPENING APPS: When the user asks you to open, launch, or go to any app, website 
 - For any other website or app the user names, use its direct URL.
 Always include this tag when the user asks to open/launch something. The app will automatically open it in a new tab.`,
           },
-          ...chatMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+          ...chatMessages.map((m) => {
+            // Detect inline image data URLs in user messages and split into vision content parts.
+            const imgRegex = /!\[\]\((data:image[^)]+)\)/g;
+            const matches = Array.from(m.content.matchAll(imgRegex)).map((mt) => mt[1]);
+            if (m.role === "user" && matches.length > 0) {
+              const text = m.content.replace(imgRegex, "").trim();
+              const parts: any[] = [];
+              if (text) parts.push({ type: "text", text });
+              for (const url of matches) parts.push({ type: "image_url", image_url: { url } });
+              return { role: "user" as const, content: parts };
+            }
+            return { role: m.role as "user" | "assistant", content: m.content };
+          }),
         ],
         stream: true,
       });

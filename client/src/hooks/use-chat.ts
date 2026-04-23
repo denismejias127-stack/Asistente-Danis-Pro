@@ -25,12 +25,15 @@ export function useChatStream(conversationId?: number) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const sendMessage = useCallback(async (content: string, model: ChatModel = "normal") => {
-    if (!content.trim() || isGenerating) return;
+  const sendMessage = useCallback(async (content: string, model: ChatModel = "normal", images: string[] = []) => {
+    if ((!content.trim() && images.length === 0) || isGenerating) return;
 
     setIsGenerating(true);
     setStreamingContent("");
-    setOptimisticUserMsg(content);
+    const optimisticContent = images.length
+      ? `${content}${content ? "\n\n" : ""}${images.map((u) => `![](${u})`).join("\n")}`
+      : content;
+    setOptimisticUserMsg(optimisticContent);
     
     let targetConvId = conversationId;
 
@@ -48,7 +51,7 @@ export function useChatStream(conversationId?: number) {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, model }),
+        body: JSON.stringify({ content, model, images }),
       });
 
       if (!response.ok) {

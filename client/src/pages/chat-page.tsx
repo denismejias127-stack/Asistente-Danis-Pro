@@ -59,9 +59,9 @@ export default function ChatPage() {
 
   const isInitialEmpty = !conversationId && messages.length === 0;
 
-  const handleSend = async (content: string) => {
+  const handleSend = async (content: string, images: string[] = []) => {
     if (mode === "chat") {
-      sendMessage(content, chatModel);
+      sendMessage(content, chatModel, images);
       return;
     }
 

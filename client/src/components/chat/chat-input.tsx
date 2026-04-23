@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, Paperclip, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,8 +11,34 @@ import { ChatModel } from "@/hooks/use-chat";
 
 type GenMode = "chat" | "image";
 
+async function resizeImage(file: File, maxSize: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width > height) { height = Math.round((height * maxSize) / width); width = maxSize; }
+          else { width = Math.round((width * maxSize) / height); height = maxSize; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("ctx"));
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, images?: string[]) => void;
   isGenerating: boolean;
   conversationId?: number;
   mode?: GenMode;
@@ -51,6 +77,22 @@ export function ChatInput({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (e.target) e.target.value = "";
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue;
+      try {
+        const dataUrl = await resizeImage(file, 1024);
+        setImages((prev) => [...prev, dataUrl]);
+      } catch {
+        toast({ title: "Error", description: "No se pudo cargar la imagen.", variant: "destructive" });
+      }
+    }
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -107,9 +149,10 @@ export function ChatInput({
   }, [input]);
 
   const handleSend = () => {
-    if (input.trim() && !isGenerating && recorder.state !== "recording") {
-      onSend(input);
+    if ((input.trim() || images.length > 0) && !isGenerating && recorder.state !== "recording") {
+      onSend(input, images);
       setInput("");
+      setImages([]);
       if (textareaRef.current) textareaRef.current.style.height = "inherit";
     }
   };
@@ -215,6 +258,35 @@ export function ChatInput({
         )}
       </div>
 
+      {/* Image previews */}
+      {images.length > 0 && (
+        <div className="flex gap-2 mb-2 px-1 flex-wrap" data-testid="container-image-previews">
+          {images.map((src, i) => (
+            <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border group">
+              <img src={src} alt="" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
+                className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                data-testid={`button-remove-image-${i}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFilePick}
+        data-testid="input-file-image"
+      />
+
       {/* Input box */}
       <div
         className={`relative flex items-end w-full glass-panel rounded-[1.5rem] shadow-lg shadow-black/5 p-2 transition-all focus-within:ring-2 ${
@@ -238,6 +310,19 @@ export function ChatInput({
         />
 
         <div className="flex-shrink-0 flex items-center ml-2 mb-1 mr-1 gap-1">
+          {mode === "chat" && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="rounded-full w-10 h-10 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
+              title="Adjuntar imagen"
+              data-testid="button-attach-image"
+            >
+              <Paperclip className="w-5 h-5" />
+            </Button>
+          )}
           {mode === "chat" && (
             <Button
               type="button"
