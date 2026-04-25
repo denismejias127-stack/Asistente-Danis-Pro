@@ -57,7 +57,22 @@ export default function LivePage() {
       // cleanup on unmount only
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cameraOn, facingMode]);
+  }, [facingMode]);
+
+  const toggleCamera = useCallback(async () => {
+    if (cameraOn) {
+      // Turn off camera tracks but keep audio if mic recording is active
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getVideoTracks().forEach((t) => t.stop());
+      }
+      setCameraOn(false);
+      if (videoRef.current) videoRef.current.srcObject = null;
+    } else {
+      setCameraOn(true);
+      await startStream(true, facingMode);
+    }
+  }, [cameraOn, facingMode, startStream]);
 
   useEffect(() => {
     return () => {
@@ -279,15 +294,20 @@ export default function LivePage() {
       {/* Controls */}
       <div className="absolute bottom-0 left-0 right-0 z-20 pb-8 pt-12 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex items-center justify-center gap-6">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-white"
-            onClick={() => setCameraOn((v) => !v)}
-            data-testid="button-toggle-camera"
-          >
-            {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-          </Button>
+          <div className="flex flex-col items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={`w-14 h-14 rounded-full text-white transition-colors ${
+                cameraOn ? "bg-white/20 hover:bg-white/30" : "bg-red-500/80 hover:bg-red-500"
+              }`}
+              onClick={toggleCamera}
+              data-testid="button-toggle-camera"
+            >
+              {cameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            </Button>
+            <span className="text-[10px] text-white/70">{cameraOn ? "Apagar cámara" : "Activar cámara"}</span>
+          </div>
 
           <Button
             size="icon"
