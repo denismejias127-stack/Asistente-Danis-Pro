@@ -167,6 +167,7 @@ export default function LivePage() {
       let buf = "";
       let assistantFull = "";
       let userFull = "";
+      let audioChunksReceived = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -186,7 +187,7 @@ export default function LivePage() {
               setAiText(ev.data);
               setStatus("speaking");
             } else if (ev.type === "audio") {
-              // decode pcm16 base64 and push to worklet
+              audioChunksReceived++;
               const raw = atob(ev.data);
               const bytes = new Uint8Array(raw.length);
               for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
@@ -201,6 +202,20 @@ export default function LivePage() {
             }
           } catch {}
         }
+      }
+
+      // Fallback: if AI audio stream returned nothing, use the browser's voice
+      if (audioChunksReceived === 0 && assistantFull && "speechSynthesis" in window) {
+        setStatus("speaking");
+        const utter = new SpeechSynthesisUtterance(assistantFull);
+        utter.lang = "es-ES";
+        utter.rate = 1.0;
+        utter.onend = () => setStatus("idle");
+        utter.onerror = () => setStatus("idle");
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utter);
+      } else if (audioChunksReceived === 0) {
+        setStatus("idle");
       }
 
       if (userFull) historyRef.current.push({ role: "user", content: userFull });
