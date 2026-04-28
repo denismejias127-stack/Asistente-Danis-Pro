@@ -63,7 +63,13 @@ export default function LivePage() {
       });
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+      // Defer srcObject assignment so the <video> element has time to mount
+      requestAnimationFrame(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      });
       setStreamReady(true);
       return stream;
     } catch (e: any) {
@@ -313,19 +319,18 @@ export default function LivePage() {
         </div>
       </header>
 
-      {/* Video */}
+      {/* Video — always mounted so srcObject can be set reliably */}
       <div className="absolute inset-0 flex items-center justify-center bg-black">
-        {cameraOn ? (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover"
-            style={{ transform: facingMode === "user" ? "scaleX(-1)" : undefined }}
-            data-testid="video-camera"
-          />
-        ) : (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover ${cameraOn ? "block" : "hidden"}`}
+          style={{ transform: facingMode === "user" ? "scaleX(-1)" : undefined }}
+          data-testid="video-camera"
+        />
+        {!cameraOn && (
           <div className="text-white/60 text-sm">Cámara apagada</div>
         )}
       </div>
