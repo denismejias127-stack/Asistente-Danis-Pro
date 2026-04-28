@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Video, VideoOff, X, SwitchCamera } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +25,34 @@ export default function LivePage() {
   const [aiText, setAiText] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handler);
+    return () => document.removeEventListener("fullscreenchange", handler);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await containerRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch {}
+  }, []);
+
+  // Auto-enter fullscreen when entering live mode
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!document.fullscreenElement && containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, []);
 
   // Start camera/mic stream — only when explicitly requested
   const startStream = useCallback(async (withVideo: boolean, face: "user" | "environment") => {
@@ -251,7 +279,7 @@ export default function LivePage() {
   }[status];
 
   return (
-    <div className="flex flex-col flex-1 h-[100dvh] bg-black text-white relative overflow-hidden">
+    <div ref={containerRef} className="flex flex-col flex-1 h-[100dvh] bg-black text-white relative overflow-hidden">
       {/* Header */}
       <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-4 h-14 bg-gradient-to-b from-black/60 to-transparent">
         <div className="flex items-center gap-3">
@@ -262,15 +290,27 @@ export default function LivePage() {
           <span className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
           <span className="text-xs text-white/80">{statusLabel}</span>
         </div>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="text-white/80 hover:text-white hover:bg-white/10"
-          onClick={() => setLocation("/")}
-          data-testid="button-close-live"
-        >
-          <X className="w-5 h-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="text-white/80 hover:text-white hover:bg-white/10"
+            onClick={toggleFullscreen}
+            data-testid="button-toggle-fullscreen"
+            title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+          >
+            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="text-white/80 hover:text-white hover:bg-white/10"
+            onClick={() => setLocation("/")}
+            data-testid="button-close-live"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
       </header>
 
       {/* Video */}
