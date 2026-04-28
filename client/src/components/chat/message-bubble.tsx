@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { UIMessage } from "@/hooks/use-chat";
 import { MarkdownRenderer } from "./markdown-renderer";
-import { Bot, User, Volume2, VolumeX, ExternalLink } from "lucide-react";
+import { Bot, User, Volume2, VolumeX, ExternalLink, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -135,32 +135,46 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
           )}
 
-          {/* Speaker button — only on assistant messages, not while streaming */}
+          {/* Action buttons — only on assistant messages, not while streaming */}
           {!isUser && !message.isStreaming && (
-            <button
-              onClick={speak}
-              data-testid="button-speak-message"
-              className={`
-                mt-2 flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors
-                ${isSpeaking
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }
-              `}
-              title={isSpeaking ? "Detener" : "Escuchar"}
-            >
-              {isSpeaking ? (
-                <>
-                  <VolumeX className="w-3.5 h-3.5" />
-                  <span>Detener</span>
-                </>
-              ) : (
-                <>
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span>Escuchar</span>
-                </>
-              )}
-            </button>
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <button
+                onClick={speak}
+                data-testid="button-speak-message"
+                className={`
+                  flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg transition-colors
+                  ${isSpeaking
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }
+                `}
+                title={isSpeaking ? "Detener" : "Escuchar"}
+              >
+                {isSpeaking ? (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5" />
+                    <span>Detener</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>Escuchar</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(stripMarkdown(cleanContent))}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="link-share-whatsapp"
+                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-500/10 transition-colors"
+                title="Compartir por WhatsApp"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>WhatsApp</span>
+              </a>
+            </div>
           )}
         </div>
       </div>
