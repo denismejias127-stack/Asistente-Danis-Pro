@@ -44,24 +44,26 @@ export default function LivePage() {
     } catch {}
   }, []);
 
-  // Auto-enter fullscreen when entering live mode
-  useEffect(() => {
-    const t = setTimeout(() => {
-      if (!document.fullscreenElement && containerRef.current?.requestFullscreen) {
-        containerRef.current.requestFullscreen().catch(() => {});
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Start camera/mic stream — only when explicitly requested
+  // Start camera/mic stream — must be called synchronously from a user gesture
   const startStream = useCallback(async (withVideo: boolean, face: "user" | "environment") => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: withVideo ? { facingMode: face } : false,
-        audio: true,
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast({
+        title: "No disponible",
+        description: "Tu navegador no permite cámara/micrófono. Usa Chrome y abre la app por HTTPS.",
+        variant: "destructive",
       });
+      return null;
+    }
+    try {
+      // Stop previous tracks BEFORE requesting new ones (some browsers block parallel access)
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+
+      const constraints: MediaStreamConstraints = {
+        audio: true,
+        video: withVideo ? { facingMode: { ideal: face } } : false,
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       // Defer srcObject assignment so the <video> element has time to mount
       requestAnimationFrame(() => {
@@ -73,11 +75,18 @@ export default function LivePage() {
       setStreamReady(true);
       return stream;
     } catch (e: any) {
-      toast({
-        title: "Sin acceso a cámara/mic",
-        description: "Activa los permisos en tu navegador.",
-        variant: "destructive",
-      });
+      const name = e?.name || "";
+      let description = "Activa los permisos en tu navegador.";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        description = "Has bloqueado el permiso. Abre los ajustes del navegador y permite cámara y micrófono para este sitio.";
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        description = "No se encontró cámara o micrófono en tu dispositivo.";
+      } else if (name === "NotReadableError") {
+        description = "Otra aplicación está usando la cámara/micrófono. Ciérrala e inténtalo otra vez.";
+      } else if (location.protocol !== "https:" && location.hostname !== "localhost") {
+        description = "Necesitas abrir la app por HTTPS para usar la cámara y el micrófono.";
+      }
+      toast({ title: "Sin acceso a cámara/mic", description, variant: "destructive" });
       return null;
     }
   }, [toast]);
