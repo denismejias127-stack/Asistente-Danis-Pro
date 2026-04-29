@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
+import { PermissionBanner } from "@/components/permission-banner";
 import { Sparkles, Image as ImageIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -115,6 +116,8 @@ export default function ChatPage() {
           </div>
         )}
       </header>
+
+      <PermissionBanner />
 
       {/* Main Chat Area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto w-full flex flex-col">
