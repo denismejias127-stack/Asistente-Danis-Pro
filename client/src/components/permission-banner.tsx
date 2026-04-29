@@ -33,11 +33,13 @@ export function PermissionBanner() {
   const grant = async () => {
     setRequesting(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      // Solo pedimos micrófono aquí. La cámara se pide dentro del chat en vivo
+      // para evitar que el WebView se confunda con dos peticiones seguidas.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((t) => t.stop());
       localStorage.setItem(STORAGE_KEY, "1");
       setShow(false);
-      toast({ title: "Listo", description: "Cámara y micrófono activados." });
+      toast({ title: "Listo", description: "Micrófono activado." });
     } catch (e: any) {
       const name = e?.name || "";
       if (name === "NotAllowedError") {

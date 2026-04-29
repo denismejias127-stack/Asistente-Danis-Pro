@@ -58,18 +58,23 @@ export default function LivePage() {
       // Stop previous tracks BEFORE requesting new ones (some browsers block parallel access)
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      // Pequeña pausa para que el WebView libere los recursos del dispositivo
+      await new Promise((r) => setTimeout(r, 80));
 
-      const constraints: MediaStreamConstraints = {
-        audio: true,
-        video: withVideo ? { facingMode: { ideal: face } } : false,
-      };
+      // Pedir audio y video por separado en WebViews puede crashear; pedimos lo mínimo necesario.
+      const constraints: MediaStreamConstraints = withVideo
+        ? { audio: true, video: { facingMode: { ideal: face }, width: { ideal: 640 }, height: { ideal: 480 } } }
+        : { audio: true, video: false };
+
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       // Defer srcObject assignment so the <video> element has time to mount
       requestAnimationFrame(() => {
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+          try {
+            videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(() => {});
+          } catch {}
         }
       });
       setStreamReady(true);
