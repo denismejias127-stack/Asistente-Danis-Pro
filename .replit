@@ -46,7 +46,7 @@ author = 58075430
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "Buil "
+args = "Build"
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_log_in_with_replit:2.0.0", "stripe:1.0.0"]
