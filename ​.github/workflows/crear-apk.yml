@@ -1,0 +1,23 @@
+name: Generar APK
+on:
+  push:
+    branches: [ "principal", "main", "master" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar y Compilar
+        run: |
+          npm install
+          npm run build --if-present
+      - name: Subir Archivos
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mi-App-Proyecto
+          path: .
+
