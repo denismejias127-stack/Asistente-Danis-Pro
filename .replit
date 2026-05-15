@@ -40,13 +40,13 @@ args = "npm run dev"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "build.yml"
+name = "npm run build" 
 mode = "sequential"
 author = 58075430
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "Build"
+args = "npm run build"
 
 [agent]
 integrations = ["javascript_openai_ai_integrations:2.0.0", "javascript_log_in_with_replit:2.0.0", "stripe:1.0.0"]
