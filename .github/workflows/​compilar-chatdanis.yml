@@ -29,8 +29,9 @@ jobs:
 
     - name: Inicializar Capacitor y Crear APK
       run: |
+        npm install -g @capacitor/cli
+        npm install @capacitor/core @capacitor/android
         npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public
-        npm install @capacitor/android
         npx cap add android
         npx cap sync
         cd android && ./gradlew assembleDebug
