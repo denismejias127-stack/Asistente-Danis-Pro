@@ -1,4 +1,4 @@
-name: Generar APK de ChatDanis
+Name: Generar APK de ChatDanis
 
 on:
   workflow_dispatch:
@@ -27,13 +27,30 @@ jobs:
         distribution: 'zulu'
         java-version: '21'
 
-    - name: Inicializar Capacitor y Crear APK
+    - name: Inicializar Capacitor y Configurar Android
       run: |
         npm install -g @capacitor/cli
         npm install @capacitor/core @capacitor/android
         npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public
         npx cap add android
         npx cap sync
+
+    - name: Forzar Versión de Kotlin (Evitar Clases Duplicadas)
+      run: |
+        echo "subprojects {
+            configurations.all {
+                resolutionStrategy {
+                    eachDependency { details ->
+                        if (details.requested.group == 'org.jetbrains.kotlin') {
+                            details.useVersion('1.8.22')
+                        }
+                    }
+                }
+            }
+        }" >> android/build.gradle
+
+    - name: Crear APK
+      run: |
         cd android && ./gradlew assembleDebug
 
     - name: Subir APK como Artefacto
@@ -41,3 +58,4 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
+
