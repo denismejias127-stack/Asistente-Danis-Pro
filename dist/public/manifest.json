@@ -1,0 +1,35 @@
+{
+  "name": "ChatDanis - Asistente IA",
+  "short_name": "ChatDanis",
+  "description": "Asistente de IA con chat, voz, cámara e imágenes — creado por Danis",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "lang": "es",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat en vivo",
+      "url": "/live",
+      "description": "Habla con la IA por cámara y voz"
+    }
+  ]
+}
