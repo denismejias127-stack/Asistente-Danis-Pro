@@ -1,4 +1,4 @@
-name: Generar APK
+name: Generar APK Ya
 on:
   push:
     branches: [ "principal", "main", "master" ]
@@ -7,16 +7,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Configurar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Instalar y Compilar
+
+      - name: Instalar y Compilar Web
         run: |
           npm install
-          npm run build --if-present
-      - name: Subir Archivos
+          npm run build
+
+      - name: Crear APK Directo con Permisos
+        uses: jantzen/web-to-apk-action@v1
+        with:
+          input-dir: dist
+          app-name: "Chatdanis"
+          package-id: "com.danis.chatdanis"
+
+      - name: Descargar APK Aqui
         uses: actions/upload-artifact@v4
         with:
-          name: Mi-App-Proyecto
-          path: .
+          name: Chatdanis-Instalable
+          path: "*.apk"
