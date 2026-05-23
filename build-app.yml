@@ -1,4 +1,4 @@
-name: Generar APK Ya
+name: Generar APK con Permisos Reales
 on:
   push:
     branches: [ "principal", "main", "master" ]
@@ -13,12 +13,14 @@ jobs:
           npm install
           npm run build
 
-      - name: Crear APK Directo con Permisos
+      - name: Crear APK Forzando Permisos de Red
         uses: jantzen/web-to-apk-action@v1
         with:
           input-dir: dist
           app-name: "Chatdanis"
           package-id: "com.danis.chatdanis"
+          # Aquí obligamos a la herramienta a activar el internet
+          permissions: "INTERNET, ACCESS_NETWORK_STATE"
 
       - name: Descargar APK Aqui
         uses: actions/upload-artifact@v4
