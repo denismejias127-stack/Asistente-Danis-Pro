@@ -77,10 +77,16 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
       // Find existing account or create new one by email
       const user = await storage.findOrCreateUserByEmail(email.toLowerCase().trim());
-      // Store in session — this is how they stay logged in
+      // Store in session and explicitly save before responding
       req.session.userId = user.id;
       req.session.isPro = user.isPro ?? false;
-      res.json(user);
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+          return res.status(500).json({ error: "Error al guardar sesión" });
+        }
+        res.json(user);
+      });
     } catch (e) {
       console.error("Email login error:", e);
       res.status(500).json({ error: "Error al iniciar sesión" });

@@ -20,17 +20,27 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: async (email: string) => {
-      const res = await fetch("/api/auth/email-login", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Error al iniciar sesión");
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch("/api/auth/email-login", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Error al iniciar sesión");
+        }
+        return res.json() as Promise<User>;
+      } catch (e: any) {
+        if (e?.name === "AbortError") throw new Error("La conexión tardó mucho. Revisa tu internet e intenta de nuevo.");
+        throw e;
+      } finally {
+        clearTimeout(timeout);
       }
-      return res.json() as Promise<User>;
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
