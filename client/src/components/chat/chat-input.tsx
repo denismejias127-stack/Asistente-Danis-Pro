@@ -236,9 +236,7 @@ export function ChatInput({
   const ActiveIcon = activeModel.icon;
 
   const placeholder =
-    mode === "image"
-      ? "Describe la imagen que quieres generar..."
-      : recorder.state === "recording"
+    recorder.state === "recording"
       ? "Escuchando..."
       : chatModel === "fast"
       ? "Respuesta rápida..."
@@ -249,7 +247,6 @@ export function ChatInput({
       : "Escribe un mensaje...";
 
   const sendBtnColor =
-    mode === "image"   ? "bg-purple-600 hover:bg-purple-700" :
     chatModel === "fast"  ? "bg-yellow-500 hover:bg-yellow-600" :
     chatModel === "think" ? "bg-blue-600 hover:bg-blue-700"   :
     chatModel === "pro"   ? "bg-purple-600 hover:bg-purple-700" : "";
@@ -317,7 +314,6 @@ export function ChatInput({
           chatModel === "fast"  ? "focus-within:ring-yellow-500/20 focus-within:border-yellow-500/20" :
           chatModel === "think" ? "focus-within:ring-blue-500/20 focus-within:border-blue-500/20"    :
           chatModel === "pro"   ? "focus-within:ring-purple-500/20 focus-within:border-purple-500/20" :
-          mode === "image"      ? "focus-within:ring-purple-500/20 focus-within:border-purple-500/20" :
                                   "focus-within:ring-primary/20 focus-within:border-primary/30"
         }`}
       >
@@ -334,29 +330,27 @@ export function ChatInput({
         />
 
         <div className="flex-shrink-0 flex items-center ml-2 mb-1 mr-1 gap-1">
-          {mode === "chat" && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className={`rounded-full w-10 h-10 transition-all duration-300 ${
-                recorder.state === "recording"
-                  ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
-                  : "text-muted-foreground"
-              }`}
-              onClick={(e) => { e.preventDefault(); handleVoiceToggle(); }}
-              disabled={isGenerating || isTranscribing}
-              data-testid="button-voice"
-            >
-              {isTranscribing ? (
-                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : recorder.state === "recording" ? (
-                <Square className="w-5 h-5 fill-current" />
-              ) : (
-                <Mic className="w-5 h-5" />
-              )}
-            </Button>
-          )}
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className={`rounded-full w-10 h-10 transition-all duration-300 ${
+              recorder.state === "recording"
+                ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
+                : "text-muted-foreground"
+            }`}
+            onClick={(e) => { e.preventDefault(); handleVoiceToggle(); }}
+            disabled={isGenerating || isTranscribing}
+            data-testid="button-voice"
+          >
+            {isTranscribing ? (
+              <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : recorder.state === "recording" ? (
+              <Square className="w-5 h-5 fill-current" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
+          </Button>
           <Button
             type="button"
             size="icon"
