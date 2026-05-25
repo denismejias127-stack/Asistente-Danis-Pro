@@ -67,7 +67,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
       {showPreview && (
         <HtmlPreviewModal html={value} onClose={() => setShowPreview(false)} />
       )}
-      <div className="relative group my-4 rounded-xl overflow-hidden border border-border/50 bg-zinc-950">
+      <div className="relative group my-4 rounded-xl overflow-x-hidden border border-border/50 bg-zinc-950">
         <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/50 border-b border-border/50 text-zinc-400 text-xs font-mono">
           <span>{language || "code"}</span>
           <div className="flex items-center gap-3">
@@ -97,7 +97,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
           style={vscDarkPlus as any}
           language={language || "html"}
           PreTag="div"
-          customStyle={{ margin: 0, background: "transparent", padding: "1rem" }}
+          customStyle={{ margin: 0, background: "transparent", padding: "1rem", whiteSpace: "pre-wrap", wordBreak: "break-all", overflowX: "hidden" }}
           {...props}
         >
           {value}

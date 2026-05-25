@@ -120,7 +120,7 @@ export default function ChatPage() {
       <PermissionBanner />
 
       {/* Main Chat Area */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto w-full flex flex-col">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden w-full flex flex-col">
         {isInitialEmpty ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-2xl mx-auto text-center">
             <motion.div
