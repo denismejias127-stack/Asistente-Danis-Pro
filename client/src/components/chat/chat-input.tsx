@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, ImagePlus, FileText, X } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, ImagePlus, Paperclip, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
