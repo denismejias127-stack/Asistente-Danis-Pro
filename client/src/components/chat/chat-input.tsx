@@ -258,7 +258,7 @@ export function ChatInput({
     chatModel === "pro"   ? "bg-purple-600 hover:bg-purple-700" : "";
 
   return (
-    <div className="relative p-4 md:p-6 pb-6 md:pb-8 w-full max-w-4xl mx-auto">
+    <div className="relative p-3 pb-5 w-[92%] mx-auto">
 
       {/* Top row: Gen mode + Model symbol button */}
       <div className="flex items-center justify-between mb-2 px-1">
