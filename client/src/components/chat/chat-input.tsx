@@ -37,6 +37,40 @@ async function resizeImage(file: File, maxSize: number): Promise<string> {
   });
 }
 
+async function extractVideoFrame(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.src = url;
+    video.currentTime = 0.5;
+    video.onloadeddata = () => {
+      video.onseeked = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.min(video.videoWidth, 1024);
+        canvas.height = Math.round(video.videoHeight * (canvas.width / video.videoWidth));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { URL.revokeObjectURL(url); return reject(new Error("ctx")); }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      video.currentTime = 0.5;
+    };
+    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error("video")); };
+  });
+}
+
+async function readTextFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
 interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void;
   isGenerating: boolean;
@@ -78,18 +112,42 @@ export function ChatInput({
   const { toast } = useToast();
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [images, setImages] = useState<string[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (e.target) e.target.value = "";
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
       try {
-        const dataUrl = await resizeImage(file, 1024);
-        setImages((prev) => [...prev, dataUrl]);
+        if (file.type.startsWith("image/")) {
+          const dataUrl = await resizeImage(file, 1024);
+          setImages((prev) => [...prev, dataUrl]);
+        } else if (file.type.startsWith("video/")) {
+          toast({ title: "Procesando video...", description: "Extrayendo imagen del video..." });
+          const frame = await extractVideoFrame(file);
+          setImages((prev) => [...prev, frame]);
+          toast({ title: "Video adjuntado", description: "Se envió una imagen del video a la IA." });
+        } else if (
+          file.type.startsWith("text/") ||
+          file.name.endsWith(".txt") ||
+          file.name.endsWith(".md") ||
+          file.name.endsWith(".csv") ||
+          file.name.endsWith(".json") ||
+          file.name.endsWith(".xml") ||
+          file.name.endsWith(".html") ||
+          file.name.endsWith(".js") ||
+          file.name.endsWith(".ts") ||
+          file.name.endsWith(".py")
+        ) {
+          const content = await readTextFile(file);
+          const truncated = content.length > 8000 ? content.slice(0, 8000) + "\n...(archivo cortado)" : content;
+          setAttachedFiles((prev) => [...prev, { name: file.name, content: truncated }]);
+        } else {
+          toast({ title: "Tipo no soportado", description: `"${file.name}" no se puede adjuntar. Usa imágenes, videos o archivos de texto.`, variant: "destructive" });
+        }
       } catch {
-        toast({ title: "Error", description: "No se pudo cargar la imagen.", variant: "destructive" });
+        toast({ title: "Error", description: `No se pudo cargar "${file.name}".`, variant: "destructive" });
       }
     }
   };
@@ -149,10 +207,17 @@ export function ChatInput({
   }, [input]);
 
   const handleSend = () => {
-    if ((input.trim() || images.length > 0) && !isGenerating && recorder.state !== "recording") {
-      onSend(input, images);
+    const hasContent = input.trim() || images.length > 0 || attachedFiles.length > 0;
+    if (hasContent && !isGenerating && recorder.state !== "recording") {
+      let finalMessage = input;
+      if (attachedFiles.length > 0) {
+        const filesText = attachedFiles.map(f => `\n\n📄 **${f.name}:**\n\`\`\`\n${f.content}\n\`\`\``).join("");
+        finalMessage = input ? input + filesText : `Aquí te adjunto ${attachedFiles.length > 1 ? "estos archivos" : "este archivo"}:${filesText}`;
+      }
+      onSend(finalMessage, images);
       setInput("");
       setImages([]);
+      setAttachedFiles([]);
       if (textareaRef.current) textareaRef.current.style.height = "inherit";
     }
   };
@@ -258,9 +323,9 @@ export function ChatInput({
         )}
       </div>
 
-      {/* Image previews */}
-      {images.length > 0 && (
-        <div className="flex gap-2 mb-2 px-1 flex-wrap" data-testid="container-image-previews">
+      {/* Image + file previews */}
+      {(images.length > 0 || attachedFiles.length > 0) && (
+        <div className="flex gap-2 mb-2 px-1 flex-wrap" data-testid="container-previews">
           {images.map((src, i) => (
             <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border group">
               <img src={src} alt="" className="w-full h-full object-cover" />
@@ -274,17 +339,31 @@ export function ChatInput({
               </button>
             </div>
           ))}
+          {attachedFiles.map((f, i) => (
+            <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-muted text-xs max-w-[160px]" data-testid={`chip-file-${i}`}>
+              <Paperclip className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
+              <span className="truncate text-foreground">{f.name}</span>
+              <button
+                type="button"
+                onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                className="flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors"
+                data-testid={`button-remove-file-${i}`}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*,.txt,.md,.csv,.json,.xml,.html,.js,.ts,.py"
         multiple
         className="hidden"
         onChange={handleFilePick}
-        data-testid="input-file-image"
+        data-testid="input-file-attach"
       />
 
       {/* Input box */}
@@ -365,9 +444,9 @@ export function ChatInput({
             type="button"
             size="icon"
             className={`rounded-full w-10 h-10 transition-all duration-300 ${sendBtnColor} ${
-              input.trim() || isGenerating ? "opacity-100 scale-100" : "opacity-50 scale-95"
+              input.trim() || images.length > 0 || attachedFiles.length > 0 || isGenerating ? "opacity-100 scale-100" : "opacity-50 scale-95"
             }`}
-            disabled={(!input.trim() && !isGenerating) || recorder.state === "recording"}
+            disabled={(!input.trim() && !isGenerating && images.length === 0 && attachedFiles.length === 0) || recorder.state === "recording"}
             onClick={(e) => { e.preventDefault(); handleSend(); }}
             data-testid="button-send"
           >
