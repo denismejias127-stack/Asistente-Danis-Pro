@@ -330,7 +330,7 @@ export function ChatInput({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="min-h-[44px] max-h-[200px] w-full resize-none border-0 bg-transparent py-3 px-4 shadow-none focus-visible:ring-0 text-[1rem]"
+          className="min-h-[92px] max-h-[200px] w-full resize-none border-0 bg-transparent py-3 px-4 shadow-none focus-visible:ring-0 text-[1rem]"
           disabled={isGenerating || recorder.state === "recording"}
           rows={1}
           data-testid="input-message"
