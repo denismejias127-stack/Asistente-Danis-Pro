@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, Paperclip, X } from "lucide-react";
+import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, ImagePlus, FileText, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
@@ -113,22 +113,28 @@ export function ChatInput({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [images, setImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string }[]>([]);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleGalleryPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (e.target) e.target.value = "";
+    for (const file of files) {
+      try {
+        const dataUrl = await resizeImage(file, 1024);
+        setImages((prev) => [...prev, dataUrl]);
+      } catch {
+        toast({ title: "Error", description: `No se pudo cargar "${file.name}".`, variant: "destructive" });
+      }
+    }
+  };
 
   const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (e.target) e.target.value = "";
     for (const file of files) {
       try {
-        if (file.type.startsWith("image/")) {
-          const dataUrl = await resizeImage(file, 1024);
-          setImages((prev) => [...prev, dataUrl]);
-        } else if (file.type.startsWith("video/")) {
-          toast({ title: "Procesando video...", description: "Extrayendo imagen del video..." });
-          const frame = await extractVideoFrame(file);
-          setImages((prev) => [...prev, frame]);
-          toast({ title: "Video adjuntado", description: "Se envió una imagen del video a la IA." });
-        } else if (
+        if (
           file.type.startsWith("text/") ||
           file.name.endsWith(".txt") ||
           file.name.endsWith(".md") ||
@@ -144,7 +150,7 @@ export function ChatInput({
           const truncated = content.length > 8000 ? content.slice(0, 8000) + "\n...(archivo cortado)" : content;
           setAttachedFiles((prev) => [...prev, { name: file.name, content: truncated }]);
         } else {
-          toast({ title: "Tipo no soportado", description: `"${file.name}" no se puede adjuntar. Usa imágenes, videos o archivos de texto.`, variant: "destructive" });
+          toast({ title: "Tipo no soportado", description: `Usa archivos .txt, .csv, .json, .py, etc.`, variant: "destructive" });
         }
       } catch {
         toast({ title: "Error", description: `No se pudo cargar "${file.name}".`, variant: "destructive" });
@@ -356,14 +362,25 @@ export function ChatInput({
         </div>
       )}
 
+      {/* Galería (fotos) */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp,image/heic"
+        multiple
+        className="hidden"
+        onChange={handleGalleryPick}
+        data-testid="input-file-gallery"
+      />
+      {/* Archivos de texto */}
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*,.txt,.md,.csv,.json,.xml,.html,.js,.ts,.py"
+        accept=".txt,.md,.csv,.json,.xml,.html,.js,.ts,.py,.log"
         multiple
         className="hidden"
         onChange={handleFilePick}
-        data-testid="input-file-attach"
+        data-testid="input-file-docs"
       />
 
       {/* Input box */}
@@ -394,12 +411,25 @@ export function ChatInput({
               type="button"
               size="icon"
               variant="ghost"
-              className="rounded-full w-10 h-10 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
-              title="Adjuntar imagen"
-              data-testid="button-attach-image"
+              className="rounded-full w-10 h-10 text-muted-foreground hover:text-primary"
+              onClick={(e) => { e.preventDefault(); galleryInputRef.current?.click(); }}
+              title="Galería (fotos)"
+              data-testid="button-gallery"
             >
-              <Paperclip className="w-5 h-5" />
+              <ImagePlus className="w-5 h-5" />
+            </Button>
+          )}
+          {mode === "chat" && (
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="rounded-full w-10 h-10 text-muted-foreground hover:text-primary"
+              onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
+              title="Adjuntar archivo"
+              data-testid="button-attach-file"
+            >
+              <FileText className="w-5 h-5" />
             </Button>
           )}
           {mode === "chat" && (
