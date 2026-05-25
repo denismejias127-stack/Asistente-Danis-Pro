@@ -338,7 +338,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
-                className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-0.5 right-0.5 bg-black/70 text-white rounded-full p-0.5"
                 data-testid={`button-remove-image-${i}`}
               >
                 <X className="w-3 h-3" />
@@ -417,19 +417,6 @@ export function ChatInput({
               data-testid="button-gallery"
             >
               <ImagePlus className="w-5 h-5" />
-            </Button>
-          )}
-          {mode === "chat" && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="rounded-full w-10 h-10 text-muted-foreground hover:text-primary"
-              onClick={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
-              title="Adjuntar archivo"
-              data-testid="button-attach-file"
-            >
-              <FileText className="w-5 h-5" />
             </Button>
           )}
           {mode === "chat" && (
