@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowUp, Square, Mic, Image as ImageIcon, MessageSquare, Zap, Brain, Star, ChevronUp, Video, ImagePlus, Paperclip, X } from "lucide-react";
+import { ArrowUp, Square, Mic, Zap, Brain, Star, MessageSquare, ChevronUp, Video, ImagePlus, Paperclip, X } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useVoiceRecorder } from "../../../replit_integrations/audio";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,7 +9,6 @@ import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { ChatModel } from "@/hooks/use-chat";
 
-type GenMode = "chat" | "image";
 
 async function resizeImage(file: File, maxSize: number): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -75,7 +74,6 @@ interface ChatInputProps {
   onSend: (message: string, images?: string[]) => void;
   isGenerating: boolean;
   conversationId?: number;
-  mode?: GenMode;
   chatModel?: ChatModel;
   onModelChange?: (model: ChatModel) => void;
 }
@@ -98,7 +96,6 @@ export function ChatInput({
   onSend,
   isGenerating,
   conversationId,
-  mode = "chat",
   chatModel = "normal",
   onModelChange,
 }: ChatInputProps) {
@@ -379,55 +376,29 @@ export function ChatInput({
       <div className="flex items-center justify-between mt-2 px-1">
         <div className="flex items-center gap-1">
           {/* Galería */}
-          {mode === "chat" && (
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); galleryInputRef.current?.click(); }}
-              className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
-              data-testid="button-gallery"
-              title="Galería"
-            >
-              <ImagePlus className="w-5 h-5" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); galleryInputRef.current?.click(); }}
+            className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+            data-testid="button-gallery"
+            title="Galería"
+          >
+            <ImagePlus className="w-5 h-5" />
+          </button>
           {/* Chat en vivo */}
-          {mode === "chat" && (
-            <button
-              type="button"
-              onClick={(e) => { e.preventDefault(); setLocation("/live"); }}
-              className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-              data-testid="button-start-live"
-              title="Chat en vivo"
-            >
-              <Video className="w-5 h-5" />
-            </button>
-          )}
-          {/* Separador */}
-          {mode === "chat" && <div className="w-px h-4 bg-border mx-1" />}
-          {[
-            { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
-            { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
-          ].map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setLocation(key === "chat" ? "/" : `/?mode=${key}`)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                mode === key
-                  ? key === "image"
-                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                    : "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid={`button-mode-${key}`}
-            >
-              <Icon className="w-3 h-3" />
-              {label}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); setLocation("/live"); }}
+            className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+            data-testid="button-start-live"
+            title="Chat en vivo"
+          >
+            <Video className="w-5 h-5" />
+          </button>
+          <div className="w-px h-4 bg-border mx-1" />
         </div>
 
-        {mode === "chat" && (
-          <div ref={menuRef} className="relative">
+        <div ref={menuRef} className="relative">
             <button
               onClick={() => setModelOpen((o) => !o)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${activeModel.color} border-current/20 bg-transparent hover:bg-muted/60`}
@@ -464,7 +435,6 @@ export function ChatInput({
               </div>
             )}
           </div>
-        )}
       </div>
     </div>
   );

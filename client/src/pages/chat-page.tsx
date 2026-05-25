@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useRoute, useSearch } from "wouter";
+import { useEffect, useRef, useState } from "react";
+import { useRoute } from "wouter";
 import { useConversation } from "@/hooks/use-conversations";
 import { useChatStream, UIMessage, ChatModel } from "@/hooks/use-chat";
 import { useAuth } from "@/hooks/use-auth";
@@ -7,35 +7,19 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
 import { PermissionBanner } from "@/components/permission-banner";
-import { Sparkles, Image as ImageIcon } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { useQueryClient } from "@tanstack/react-query";
-import { api } from "@shared/routes";
-import { useToast } from "@/hooks/use-toast";
-import { useCreateConversation } from "@/hooks/use-conversations";
-import { useLocation } from "wouter";
-
-type GenMode = "chat" | "image";
 
 export default function ChatPage() {
   const [, params] = useRoute("/c/:id");
-  const search = useSearch();
   const conversationId = params?.id ? parseInt(params.id) : undefined;
 
   const { data: conversationData, isLoading } = useConversation(conversationId);
   const { sendMessage, isGenerating, streamingContent, optimisticUserMsg } = useChatStream(conversationId);
   const { user } = useAuth();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const createConv = useCreateConversation();
-  const [, setLocation] = useLocation();
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [chatModel, setChatModel] = useState<ChatModel>("normal");
-
-  const searchParams = new URLSearchParams(search);
-  const mode: GenMode = (searchParams.get("mode") as GenMode) || "chat";
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -60,44 +44,9 @@ export default function ChatPage() {
 
   const isInitialEmpty = !conversationId && messages.length === 0;
 
-  const handleSend = async (content: string, images: string[] = []) => {
-    if (mode === "chat") {
-      sendMessage(content, chatModel, images);
-      return;
-    }
-
-    if (mode === "image") {
-      setIsGeneratingMedia(true);
-      try {
-        let targetConvId = conversationId;
-        if (!targetConvId) {
-          const newConv = await createConv.mutateAsync();
-          targetConvId = newConv.id;
-          setLocation(`/c/${newConv.id}`);
-        }
-
-        const res = await fetch("/api/generate-image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ prompt: content, conversationId: targetConvId }),
-        });
-
-        if (!res.ok) throw new Error("Error generando imagen");
-
-        queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, targetConvId] });
-        queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
-      } catch {
-        toast({ title: "Error", description: "No se pudo generar la imagen.", variant: "destructive" });
-      } finally {
-        setIsGeneratingMedia(false);
-      }
-    }
+  const handleSend = (content: string, images: string[] = []) => {
+    sendMessage(content, chatModel, images);
   };
-
-  const modeInfo = mode === "image"
-    ? { icon: ImageIcon, label: "Modo Imagen", color: "text-purple-500" }
-    : null;
 
   return (
     <div className="flex flex-col flex-1 h-[100dvh] bg-background overflow-hidden min-h-0">
@@ -109,12 +58,6 @@ export default function ChatPage() {
             {conversationData?.title || "Nueva conversación"}
           </h1>
         </div>
-        {modeInfo && (
-          <div className={`flex items-center gap-1.5 text-sm font-medium ${modeInfo.color}`}>
-            <modeInfo.icon className="w-4 h-4" />
-            {modeInfo.label}
-          </div>
-        )}
       </header>
 
       <PermissionBanner />
@@ -129,11 +72,7 @@ export default function ChatPage() {
               transition={{ duration: 0.5, ease: "easeOut" }}
               className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 shadow-inner"
             >
-              {mode === "image" ? (
-                <ImageIcon className="w-8 h-8 text-purple-500" />
-              ) : (
-                <Sparkles className="w-8 h-8 text-primary" />
-              )}
+              <Sparkles className="w-8 h-8 text-primary" />
             </motion.div>
             <motion.h2
               initial={{ y: 10, opacity: 0 }}
@@ -141,7 +80,7 @@ export default function ChatPage() {
               transition={{ delay: 0.1, duration: 0.5 }}
               className="text-2xl md:text-3xl font-bold tracking-tight mb-3"
             >
-              {mode === "image" ? "¿Qué imagen quieres crear?" : "¿En qué te puedo ayudar?"}
+              ¿En qué te puedo ayudar?
             </motion.h2>
             <motion.p
               initial={{ y: 10, opacity: 0 }}
@@ -149,9 +88,7 @@ export default function ChatPage() {
               transition={{ delay: 0.2, duration: 0.5 }}
               className="text-muted-foreground text-lg"
             >
-              {mode === "image"
-                ? "Describe con detalle la imagen que quieres y la genero en segundos."
-                : "Puedo responder preguntas, escribir código, ayudarte a crear contenido y más."}
+              Puedo responder preguntas, escribir código, generar imágenes y más.
             </motion.p>
           </div>
         ) : (
@@ -163,13 +100,7 @@ export default function ChatPage() {
             ) : (
               messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
             )}
-            {isGeneratingMedia && (
-              <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border">
-                <span className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                <span className="text-sm text-muted-foreground">Generando imagen...</span>
-              </div>
-            )}
-          </div>
+            </div>
         )}
       </div>
 
@@ -177,9 +108,8 @@ export default function ChatPage() {
       <div className="flex-none border-t border-border/50 bg-background">
         <ChatInput
           onSend={handleSend}
-          isGenerating={isGenerating || isGeneratingMedia}
+          isGenerating={isGenerating}
           conversationId={conversationId}
-          mode={mode}
           chatModel={chatModel}
           onModelChange={setChatModel}
         />

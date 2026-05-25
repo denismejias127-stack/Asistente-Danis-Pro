@@ -183,8 +183,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
 
       // ── Auto-detect image generation requests ────────────────────────────────
-      const imageKeywords = /\b(genera|crea|haz|hazme|dibuja|muéstrame|genera\s+una|crea\s+una|haz\s+una|imagen\s+de|foto\s+de|generate|create|draw|make\s+an?\s+image|image\s+of)\b/i;
-      const isImageRequest = imgs.length === 0 && content && imageKeywords.test(content);
+      // Detect: verb + image noun OR "imagen/foto de" pattern
+      const imageVerbNoun = /\b(genera|crea|haz|hazme|hazle|as|dame|muéstrame|dibuja|pinta|diseña|ilustra|make|create|generate|draw|show)\b.{0,30}\b(imagen|foto|picture|image|photo|ilustración|dibujo)\b/i;
+      const imageNounOf = /\b(imagen|foto|picture|image|photo)\s+(de|del|of|para|con)\b/i;
+      const isImageRequest = imgs.length === 0 && content && (imageVerbNoun.test(content) || imageNounOf.test(content));
 
       if (isImageRequest) {
         await storage.createMessage(conversationId, "user", content);
