@@ -70,7 +70,7 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
       <div className="relative group my-4 rounded-xl overflow-hidden border border-border/50 bg-zinc-950">
         <div className="flex items-center justify-between px-4 py-2 bg-zinc-900/50 border-b border-border/50 text-zinc-400 text-xs font-mono">
           <span>{language || "code"}</span>
-          <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-3">
             {isHtml && (
               <button
                 onClick={() => setShowPreview(true)}
