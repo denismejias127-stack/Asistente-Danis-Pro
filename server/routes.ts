@@ -182,6 +182,41 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
 
+      // ── Auto-detect image generation requests ────────────────────────────────
+      const imageKeywords = /\b(genera|crea|haz|hazme|dibuja|muéstrame|genera\s+una|crea\s+una|haz\s+una|imagen\s+de|foto\s+de|generate|create|draw|make\s+an?\s+image|image\s+of)\b/i;
+      const isImageRequest = imgs.length === 0 && content && imageKeywords.test(content);
+
+      if (isImageRequest) {
+        await storage.createMessage(conversationId, "user", content);
+        res.setHeader("Content-Type", "text/event-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.setHeader("Connection", "keep-alive");
+        try {
+          const imgRes = await openai.images.generate({
+            model: "gpt-image-1",
+            prompt: content,
+            n: 1,
+            size: "1024x1024",
+          } as any);
+          const imageBase64 = (imgRes.data?.[0] as any)?.b64_json;
+          if (!imageBase64) throw new Error("No image returned");
+          const dataUrl = `data:image/png;base64,${imageBase64}`;
+          const assistantContent = `![](${dataUrl})`;
+          await storage.createMessage(conversationId, "assistant", assistantContent);
+          res.write(`data: ${JSON.stringify({ content: assistantContent })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        } catch (err) {
+          console.error("Auto image gen error:", err);
+          const errMsg = "No pude generar la imagen. Intenta de nuevo.";
+          await storage.createMessage(conversationId, "assistant", errMsg);
+          res.write(`data: ${JSON.stringify({ content: errMsg })}\n\n`);
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        }
+        res.end();
+        return;
+      }
+      // ─────────────────────────────────────────────────────────────────────────
+
       const persistedContent = imgs.length
         ? `${content}${content ? "\n\n" : ""}${imgs.map((u) => `![](${u})`).join("\n")}`
         : content;
