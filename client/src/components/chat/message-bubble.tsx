@@ -111,7 +111,25 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
           `}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap leading-relaxed text-[0.95rem]">{message.content}</p>
+            (() => {
+              const imgRegex = /!\[\]\((data:image\/[^)]+)\)/g;
+              const imgs: string[] = [];
+              let m;
+              while ((m = imgRegex.exec(message.content)) !== null) imgs.push(m[1]);
+              const text = message.content.replace(/!\[\]\(data:image\/[^)]+\)/g, "").trim();
+              return (
+                <>
+                  {imgs.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {imgs.map((src, i) => (
+                        <img key={i} src={src} alt="" className="max-w-[200px] max-h-[200px] rounded-xl object-cover border border-white/20" />
+                      ))}
+                    </div>
+                  )}
+                  {text && <p className="whitespace-pre-wrap leading-relaxed text-[0.95rem]">{text}</p>}
+                </>
+              );
+            })()
           ) : (
             <MarkdownRenderer content={cleanContent} />
           )}
