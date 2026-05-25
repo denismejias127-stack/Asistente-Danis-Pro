@@ -26,7 +26,7 @@ export default function LoginPage() {
             <Sparkles className="w-10 h-10 text-primary" />
           </div>
           <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight">AI Assistant</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Bienvenido a ChatDanis</h1>
             <p className="text-muted-foreground mt-2 text-base">
               Escribe tu correo y entra de inmediato
             </p>
