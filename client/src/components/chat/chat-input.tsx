@@ -337,57 +337,6 @@ export function ChatInput({
         />
 
         <div className="flex-shrink-0 flex items-center ml-2 mb-1 mr-1 gap-1">
-          {mode === "chat" && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="rounded-full w-10 h-10 text-muted-foreground hover:text-primary"
-              onClick={(e) => { e.preventDefault(); galleryInputRef.current?.click(); }}
-              title="Galería (fotos)"
-              data-testid="button-gallery"
-            >
-              <ImagePlus className="w-5 h-5" />
-            </Button>
-          )}
-          {mode === "chat" && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="rounded-full w-10 h-10 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
-              onClick={(e) => { e.preventDefault(); setLocation("/live"); }}
-              title="Iniciar chat en vivo (cámara + voz)"
-              data-testid="button-start-live"
-            >
-              <Video className="w-5 h-5" />
-            </Button>
-          )}
-          {mode === "chat" && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className={`rounded-full w-10 h-10 transition-all duration-300 ${
-                recorder.state === "recording"
-                  ? "text-destructive bg-destructive/10 hover:bg-destructive/20"
-                  : "text-muted-foreground"
-              }`}
-              onClick={(e) => { e.preventDefault(); handleVoiceToggle(); }}
-              disabled={isGenerating || isTranscribing}
-              title={recorder.state === "recording" ? "Detener dictado" : "Dictar mensaje por voz"}
-              data-testid="button-voice"
-            >
-              {isTranscribing ? (
-                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : recorder.state === "recording" ? (
-                <Square className="w-5 h-5 fill-current" />
-              ) : (
-                <Mic className="w-5 h-5" />
-              )}
-            </Button>
-          )}
-
           <Button
             type="button"
             size="icon"
@@ -403,9 +352,58 @@ export function ChatInput({
         </div>
       </div>
 
-      {/* Bottom row: Gen mode + Model selector */}
+      {/* Bottom row: action buttons + mode + model */}
       <div className="flex items-center justify-between mt-2 px-1">
         <div className="flex items-center gap-1">
+          {/* Galería */}
+          {mode === "chat" && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); galleryInputRef.current?.click(); }}
+              className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-primary hover:bg-muted transition-colors"
+              data-testid="button-gallery"
+              title="Galería"
+            >
+              <ImagePlus className="w-5 h-5" />
+            </button>
+          )}
+          {/* Chat en vivo */}
+          {mode === "chat" && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); setLocation("/live"); }}
+              className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+              data-testid="button-start-live"
+              title="Chat en vivo"
+            >
+              <Video className="w-5 h-5" />
+            </button>
+          )}
+          {/* Micrófono */}
+          {mode === "chat" && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); handleVoiceToggle(); }}
+              disabled={isGenerating || isTranscribing}
+              className={`flex items-center justify-center w-9 h-9 rounded-full transition-colors ${
+                recorder.state === "recording"
+                  ? "text-destructive bg-destructive/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              data-testid="button-voice"
+              title={recorder.state === "recording" ? "Detener" : "Voz"}
+            >
+              {isTranscribing ? (
+                <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              ) : recorder.state === "recording" ? (
+                <Square className="w-5 h-5 fill-current" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+          )}
+          {/* Separador */}
+          {mode === "chat" && <div className="w-px h-4 bg-border mx-1" />}
           {[
             { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
             { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
