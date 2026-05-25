@@ -260,75 +260,6 @@ export function ChatInput({
   return (
     <div className="relative p-3 pb-5 w-[92%] mx-auto">
 
-      {/* Top row: Gen mode + Model symbol button */}
-      <div className="flex items-center justify-between mb-2 px-1">
-        {/* Gen mode (Chat / Imagen) */}
-        <div className="flex items-center gap-1">
-          {[
-            { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
-            { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
-          ].map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setLocation(key === "chat" ? "/" : `/?mode=${key}`)}
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                mode === key
-                  ? key === "image"
-                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
-                    : "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              data-testid={`button-mode-${key}`}
-            >
-              <Icon className="w-3 h-3" />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Single model button — only in chat mode */}
-        {mode === "chat" && (
-          <div ref={menuRef} className="relative">
-            <button
-              onClick={() => setModelOpen((o) => !o)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${activeModel.color} border-current/20 bg-transparent hover:bg-muted/60`}
-              data-testid="button-model-toggle"
-            >
-              <ActiveIcon className="w-3.5 h-3.5" />
-              {activeModel.label}
-              <ChevronUp className={`w-3 h-3 transition-transform ${modelOpen ? "rotate-180" : ""}`} />
-            </button>
-
-            {/* Dropdown menu */}
-            {modelOpen && (
-              <div className="absolute bottom-full right-0 mb-2 w-52 rounded-2xl border border-border bg-popover shadow-xl shadow-black/10 overflow-hidden z-50">
-                <div className="p-1.5 space-y-0.5">
-                  {MODEL_OPTIONS.map(({ key, label, icon: Icon, description, color, bg }) => (
-                    <button
-                      key={key}
-                      onClick={() => { onModelChange?.(key); setModelOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${bg} ${
-                        chatModel === key ? "ring-1 ring-inset ring-current/20 " + color : "text-foreground"
-                      }`}
-                      data-testid={`button-model-${key}`}
-                    >
-                      <Icon className={`w-4 h-4 flex-shrink-0 ${chatModel === key ? color : "text-muted-foreground"}`} />
-                      <div>
-                        <div className={`text-sm font-semibold ${chatModel === key ? color : ""}`}>{label}</div>
-                        <div className="text-[11px] text-muted-foreground">{description}</div>
-                      </div>
-                      {chatModel === key && (
-                        <div className={`ml-auto w-2 h-2 rounded-full bg-current ${color}`} />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Image + file previews */}
       {(images.length > 0 || attachedFiles.length > 0) && (
         <div className="flex gap-2 mb-2 px-1 flex-wrap" data-testid="container-previews">
@@ -472,8 +403,70 @@ export function ChatInput({
         </div>
       </div>
 
-      <div className="text-center mt-2 text-xs text-muted-foreground/60 px-4">
-        La IA puede cometer errores. Verifica la información importante.
+      {/* Bottom row: Gen mode + Model selector */}
+      <div className="flex items-center justify-between mt-2 px-1">
+        <div className="flex items-center gap-1">
+          {[
+            { key: "chat" as GenMode, icon: MessageSquare, label: "Chat" },
+            { key: "image" as GenMode, icon: ImageIcon, label: "Imagen" },
+          ].map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setLocation(key === "chat" ? "/" : `/?mode=${key}`)}
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                mode === key
+                  ? key === "image"
+                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                    : "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              data-testid={`button-mode-${key}`}
+            >
+              <Icon className="w-3 h-3" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {mode === "chat" && (
+          <div ref={menuRef} className="relative">
+            <button
+              onClick={() => setModelOpen((o) => !o)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${activeModel.color} border-current/20 bg-transparent hover:bg-muted/60`}
+              data-testid="button-model-toggle"
+            >
+              <ActiveIcon className="w-3.5 h-3.5" />
+              {activeModel.label}
+              <ChevronUp className={`w-3 h-3 transition-transform ${modelOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {modelOpen && (
+              <div className="absolute bottom-full right-0 mb-2 w-52 rounded-2xl border border-border bg-popover shadow-xl shadow-black/10 overflow-hidden z-50">
+                <div className="p-1.5 space-y-0.5">
+                  {MODEL_OPTIONS.map(({ key, label, icon: Icon, description, color, bg }) => (
+                    <button
+                      key={key}
+                      onClick={() => { onModelChange?.(key); setModelOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${bg} ${
+                        chatModel === key ? "ring-1 ring-inset ring-current/20 " + color : "text-foreground"
+                      }`}
+                      data-testid={`button-model-${key}`}
+                    >
+                      <Icon className={`w-4 h-4 flex-shrink-0 ${chatModel === key ? color : "text-muted-foreground"}`} />
+                      <div>
+                        <div className={`text-sm font-semibold ${chatModel === key ? color : ""}`}>{label}</div>
+                        <div className="text-[11px] text-muted-foreground">{description}</div>
+                      </div>
+                      {chatModel === key && (
+                        <div className={`ml-auto w-2 h-2 rounded-full bg-current ${color}`} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
