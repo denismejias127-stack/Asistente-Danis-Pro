@@ -34,14 +34,13 @@ export default function LoginPage() {
         </div>
 
         {/* Email form */}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3" noValidate>
           <Input
-            type="email"
+            type="text"
             placeholder="tucorreo@ejemplo.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="h-12 text-base rounded-xl px-4"
-            autoFocus
             autoComplete="email"
             inputMode="email"
             data-testid="input-email"
