@@ -103,7 +103,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
         {/* Bubble */}
         <div
           className={`
-            px-5 py-4 rounded-2xl relative
+            px-5 py-4 rounded-2xl relative overflow-hidden min-w-0
             ${isUser
               ? "bg-primary text-primary-foreground rounded-tr-sm shadow-sm"
               : "bg-card border border-border shadow-sm shadow-black/5 rounded-tl-sm"

@@ -97,7 +97,9 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
           style={vscDarkPlus as any}
           language={language || "html"}
           PreTag="div"
-          customStyle={{ margin: 0, background: "transparent", padding: "1rem", whiteSpace: "pre-wrap", wordBreak: "break-all", overflowX: "hidden" }}
+          wrapLines={true}
+          wrapLongLines={true}
+          customStyle={{ margin: 0, background: "transparent", padding: "1rem", overflowX: "hidden", wordBreak: "break-word" }}
           {...props}
         >
           {value}
