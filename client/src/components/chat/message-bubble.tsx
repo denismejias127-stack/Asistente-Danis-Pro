@@ -81,7 +81,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
       animate={{ opacity: 1, y: 0 }}
       className={`flex w-full ${isUser ? "justify-end" : "justify-start"} mb-6`}
     >
-      <div className={`flex gap-4 max-w-[95%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+      <div className={`flex gap-4 max-w-[97%] ${isUser ? "flex-row-reverse" : "flex-row"}`}>
 
         {/* Avatar */}
         <div className="flex-shrink-0 pt-1">
