@@ -193,25 +193,30 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         res.setHeader("Content-Type", "text/event-stream");
         res.setHeader("Cache-Control", "no-cache");
         res.setHeader("Connection", "keep-alive");
+        // Send a "thinking" signal so the frontend shows loading
+        res.write(`data: ${JSON.stringify({ content: "⏳ Generando imagen..." })}\n\n`);
         try {
           const imgRes = await openai.images.generate({
             model: "gpt-image-1",
             prompt: content,
             n: 1,
             size: "1024x1024",
+            quality: "medium",
           } as any);
           const imageBase64 = (imgRes.data?.[0] as any)?.b64_json;
           if (!imageBase64) throw new Error("No image returned");
           const dataUrl = `data:image/png;base64,${imageBase64}`;
           const assistantContent = `![](${dataUrl})`;
+          // Save to DB — frontend will refetch on done signal
           await storage.createMessage(conversationId, "assistant", assistantContent);
-          res.write(`data: ${JSON.stringify({ content: assistantContent })}\n\n`);
+          // Overwrite the "thinking" message with a blank so the DB version shows cleanly
+          res.write(`data: ${JSON.stringify({ replace: assistantContent })}\n\n`);
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         } catch (err) {
           console.error("Auto image gen error:", err);
           const errMsg = "No pude generar la imagen. Intenta de nuevo.";
           await storage.createMessage(conversationId, "assistant", errMsg);
-          res.write(`data: ${JSON.stringify({ content: errMsg })}\n\n`);
+          res.write(`data: ${JSON.stringify({ replace: errMsg })}\n\n`);
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         }
         res.end();

@@ -84,6 +84,10 @@ export function useChatStream(conversationId?: number) {
               if (data.content) {
                 setStreamingContent(prev => prev + data.content);
               }
+              if (data.replace !== undefined) {
+                // Used for image gen: replace the entire streaming content at once
+                setStreamingContent(data.replace);
+              }
               if (data.error) {
                 throw new Error(data.error);
               }
