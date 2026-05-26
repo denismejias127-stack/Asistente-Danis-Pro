@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { UIMessage } from "@/hooks/use-chat";
 import { MarkdownRenderer } from "./markdown-renderer";
-import { Bot, User, Volume2, VolumeX, ExternalLink, Share2 } from "lucide-react";
+import { Bot, User, Volume2, VolumeX, ExternalLink, Share2, Download } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -31,12 +31,25 @@ function parseOpenUrl(content: string): { cleanContent: string; url: string | nu
   return { cleanContent, url };
 }
 
+function extractGeneratedImage(content: string): string | null {
+  const m = content.match(/!\[\]\((data:image\/[^)]+)\)/);
+  return m ? m[1] : null;
+}
+
+function downloadImage(dataUrl: string) {
+  const a = document.createElement("a");
+  a.href = dataUrl;
+  a.download = `chatdanis-imagen-${Date.now()}.png`;
+  a.click();
+}
+
 export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [opened, setOpened] = useState(false);
 
   const { cleanContent, url } = parseOpenUrl(message.content);
+  const generatedImage = !isUser ? extractGeneratedImage(cleanContent) : null;
 
   // Auto-open URL once when the message is complete (not streaming)
   useEffect(() => {
@@ -192,6 +205,18 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
                 <Share2 className="w-3.5 h-3.5" />
                 <span>WhatsApp</span>
               </a>
+
+              {generatedImage && (
+                <button
+                  onClick={() => downloadImage(generatedImage)}
+                  data-testid="button-download-image"
+                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors"
+                  title="Descargar imagen"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Guardar</span>
+                </button>
+              )}
             </div>
           )}
         </div>
