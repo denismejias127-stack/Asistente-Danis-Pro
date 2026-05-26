@@ -109,6 +109,18 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
   );
 };
 
+const ImageBlock = ({ src, alt }: { src?: string; alt?: string }) => {
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt={alt || "imagen generada"}
+      className="max-w-full rounded-xl my-2 border border-border shadow-sm"
+      style={{ maxHeight: "400px", objectFit: "contain" }}
+    />
+  );
+};
+
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
     <div className="prose-custom max-w-none break-words">
@@ -116,6 +128,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content }: Mark
         remarkPlugins={[remarkGfm]}
         components={{
           code: CodeBlock,
+          img: ImageBlock,
         }}
       >
         {content}
