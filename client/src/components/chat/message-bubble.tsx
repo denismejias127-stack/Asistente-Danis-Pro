@@ -1,12 +1,13 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { UIMessage } from "@/hooks/use-chat";
 import { MarkdownRenderer } from "./markdown-renderer";
-import { Bot, User, Volume2, VolumeX, ExternalLink, Share2, Download } from "lucide-react";
+import { Bot, User, Volume2, VolumeX, ExternalLink, Share2, Download, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface MessageBubbleProps {
   message: UIMessage;
+  onRegenerate?: () => void;
 }
 
 function stripMarkdown(text: string): string {
@@ -43,7 +44,7 @@ function downloadImage(dataUrl: string) {
   a.click();
 }
 
-export const MessageBubble = memo(function MessageBubble({ message }: MessageBubbleProps) {
+export const MessageBubble = memo(function MessageBubble({ message, onRegenerate }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [opened, setOpened] = useState(false);
@@ -207,15 +208,28 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
               </a>
 
               {generatedImage && (
-                <button
-                  onClick={() => downloadImage(generatedImage)}
-                  data-testid="button-download-image"
-                  className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors"
-                  title="Descargar imagen"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Guardar</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => downloadImage(generatedImage)}
+                    data-testid="button-download-image"
+                    className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10 transition-colors"
+                    title="Descargar imagen"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Guardar</span>
+                  </button>
+                  {onRegenerate && (
+                    <button
+                      onClick={onRegenerate}
+                      data-testid="button-regenerate-image"
+                      className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg text-muted-foreground hover:text-orange-500 hover:bg-orange-500/10 transition-colors"
+                      title="Generar otra vez"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Otra vez</span>
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}

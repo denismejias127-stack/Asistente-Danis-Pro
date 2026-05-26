@@ -98,7 +98,14 @@ export default function ChatPage() {
                 <span className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
             ) : (
-              messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+              messages.map((msg, i) => {
+                const prevMsg = i > 0 ? messages[i - 1] : null;
+                const isGeneratedImg = msg.role === "assistant" && /!\[\]\(data:image\//.test(msg.content);
+                const onRegenerate = isGeneratedImg && prevMsg?.role === "user"
+                  ? () => handleSend(prevMsg.content)
+                  : undefined;
+                return <MessageBubble key={msg.id} message={msg} onRegenerate={onRegenerate} />;
+              })
             )}
             </div>
         )}

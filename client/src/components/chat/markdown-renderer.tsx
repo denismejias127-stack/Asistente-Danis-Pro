@@ -109,30 +109,45 @@ const CodeBlock = ({ inline, className, children, ...props }: any) => {
   );
 };
 
-const ImageBlock = ({ src, alt }: { src?: string; alt?: string }) => {
-  if (!src) return null;
-  return (
-    <img
-      src={src}
-      alt={alt || "imagen generada"}
-      className="max-w-full rounded-xl my-2 border border-border shadow-sm"
-      style={{ maxHeight: "400px", objectFit: "contain" }}
-    />
-  );
-};
+// Split content into text and data-URL image segments before passing to ReactMarkdown
+// (react-markdown v10 can struggle with very long data URLs)
+function splitContentImages(content: string): { type: "text" | "image"; value: string }[] {
+  const parts: { type: "text" | "image"; value: string }[] = [];
+  const regex = /!\[\]\((data:image\/[^)]{10,})\)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(content)) !== null) {
+    if (m.index > last) parts.push({ type: "text", value: content.slice(last, m.index) });
+    parts.push({ type: "image", value: m[1] });
+    last = m.index + m[0].length;
+  }
+  if (last < content.length) parts.push({ type: "text", value: content.slice(last) });
+  return parts;
+}
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRendererProps) {
+  const parts = splitContentImages(content);
   return (
     <div className="prose-custom max-w-none break-words">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          code: CodeBlock,
-          img: ImageBlock,
-        }}
-      >
-        {content}
-      </ReactMarkdown>
+      {parts.map((part, i) =>
+        part.type === "image" ? (
+          <img
+            key={i}
+            src={part.value}
+            alt="imagen generada"
+            className="max-w-full rounded-xl my-2 border border-border shadow-sm block"
+            style={{ maxHeight: "420px", objectFit: "contain" }}
+          />
+        ) : part.value.trim() ? (
+          <ReactMarkdown
+            key={i}
+            remarkPlugins={[remarkGfm]}
+            components={{ code: CodeBlock }}
+          >
+            {part.value}
+          </ReactMarkdown>
+        ) : null
+      )}
     </div>
   );
 });
