@@ -1,14 +1,12 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
-import { log } from "./vite";
 import { serveStatic } from "./static";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Agregamos un log para saber que el archivo index.ts al menos empezó a leerse
 console.log("🚀 INICIANDO PROCESO DE ARRANQUE DEL SERVIDOR...");
 
 const httpServer = createServer(app);
@@ -36,10 +34,9 @@ const httpServer = createServer(app);
 
     const port = process.env.PORT || "5000";
     httpServer.listen(port, () => {
-      log(`serving on port ${port}`);
+      console.log(`[server] serving on port ${port}`);
     });
   } catch (error) {
-    // ESTO OBLIGARÁ A RENDER A MOSTRAR EL ERROR REAL EN LA PANTALLA
     console.log("❌ ERROR CRÍTICO CAPTURADO EN EL ARRANQUE:");
     console.error(error);
     process.exit(1);
