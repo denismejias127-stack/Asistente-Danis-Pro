@@ -1,9 +1,7 @@
-
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { setupAuth } from "./replit_integrations/auth/replitAuth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -61,9 +59,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // Setup authentication BEFORE routes
-  await setupAuth(app);
-
+  // Saltamos la autenticación de Replit para que encienda directo en Render sin pedir el clientId
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
