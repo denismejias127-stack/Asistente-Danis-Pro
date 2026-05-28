@@ -1,7 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // URL activa de tu Replit vinculada directamente para el APK
-const BASE_URL = "https://7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c-00-2z78698s1ogot.kirk.replit.dev"; 
+const BASE_URL =https://chatdanid--denismejias127.replit.app
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
