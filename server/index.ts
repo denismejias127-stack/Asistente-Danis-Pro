@@ -2,8 +2,13 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
 import { serveStatic } from "./static";
+import cors from "cors"; // Importamos CORS para permitir conexiones externas
 
 const app = express();
+
+// Habilitamos CORS antes de cualquier otra ruta o middleware
+app.use(cors({ origin: "*" })); 
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -16,6 +21,7 @@ const httpServer = createServer(app);
     console.log("📡 Registrando rutas...");
     await registerRoutes(httpServer, app);
 
+    // Middleware para manejo de errores globales
     app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
       const message = err.message || "Internal Server Error";
