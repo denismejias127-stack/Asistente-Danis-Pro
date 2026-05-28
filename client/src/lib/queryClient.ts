@@ -1,5 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// URL activa de tu Replit vinculada directamente para el APK
+const BASE_URL = "https://7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c-00-2z78698s1ogot.kirk.replit.dev"; 
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,7 +15,9 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(`https://asistente-danis-pro-1.onrender.com${url}`, {
+  const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+  
+  const res = await fetch(`${BASE_URL}${cleanUrl}`, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -29,7 +34,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(`https://asistente-danis-pro-1.onrender.com${queryKey.join("/")}`, {
+    const path = queryKey.join("/");
+    const cleanUrl = path.startsWith("/") ? path : `/${path}`;
+
+    const res = await fetch(`${BASE_URL}${cleanUrl}`, {
       credentials: "include",
     });
 
