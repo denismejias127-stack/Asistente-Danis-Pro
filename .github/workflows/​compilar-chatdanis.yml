@@ -1,4 +1,4 @@
-Name: Generar APK de ChatDanis
+name: Generar APK de ChatDanis
 
 on:
   workflow_dispatch:
