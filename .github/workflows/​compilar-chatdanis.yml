@@ -1,4 +1,4 @@
-name: Generar APK de ChatDanis
+Name: Generar APK de ChatDanis
 
 on:
   workflow_dispatch:
@@ -35,10 +35,11 @@ jobs:
         npx cap add android
         npx cap sync
 
-    - name: Inyectar Permiso de Internet en Android
+    - name: Inyectar Permiso de Internet y Tráfico Libre en Android
       run: |
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET" \/>' android/app/src/main/AndroidManifest.xml
-        echo "¡Permiso de Internet inyectado con éxito!"
+        sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
+        echo "¡Permiso de Internet y Tráfico Libre inyectados con éxito!"
 
     - name: Forzar Versión de Kotlin (Evitar Clases Duplicadas)
       run: |
@@ -63,3 +64,4 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
+
