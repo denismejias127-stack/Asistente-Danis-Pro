@@ -2,15 +2,21 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
 import { serveStatic } from "./static";
-import cors from "cors"; // Importamos CORS para permitir conexiones externas
+import cors from "cors"; 
 
 const app = express();
 
-// Habilitamos CORS antes de cualquier otra ruta o middleware
+// 1. CORS abierto y listo para tu APK
 app.use(cors({ origin: "*" })); 
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Middleware para ver en la consola si el APK está intentando tocar el servidor
+app.use((req, _res, next) => {
+  console.log(`[Petición] ${req.method} desde ${req.ip} a ${req.url}`);
+  next();
+});
 
 console.log("🚀 INICIANDO PROCESO DE ARRANQUE DEL SERVIDOR...");
 
@@ -38,9 +44,11 @@ const httpServer = createServer(app);
       await setupVite(httpServer, app);
     }
 
-    const port = process.env.PORT || "5000";
-    httpServer.listen(port, () => {
-      console.log(`[server] serving on port ${port}`);
+    const port = parseInt(process.env.PORT || "5000", 10);
+    
+    // 2. CORRECCIÓN CLAVE: Obligar a escuchar en '0.0.0.0' para que Replit deje pasar al APK
+    httpServer.listen(port, '0.0.0.0', () => {
+      console.log(`[server] Chatdanis activo y sirviendo en el puerto ${port}`);
     });
   } catch (error) {
     console.log("❌ ERROR CRÍTICO CAPTURADO EN EL ARRANQUE:");
