@@ -21,7 +21,6 @@ export async function apiRequest(
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -37,9 +36,7 @@ export const getQueryFn: <T>(options: {
     const path = queryKey.join("/");
     const cleanUrl = path.startsWith("/") ? path : `/${path}`;
 
-    const res = await fetch(`${BASE_URL}${cleanUrl}`, {
-      credentials: "include",
-    });
+    const res = await fetch(`${BASE_URL}${cleanUrl}`);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
