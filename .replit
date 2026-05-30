@@ -1,51 +1,39 @@
-name: Build Android APK
-on:
-  push:
-    branches: [ main, master ]
+modules = ["nodejs-20", "web", "postgresql-16"]
+run = "npm run dev"
+hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source Code
-        uses: actions/checkout@v4
+[nix]
+channel = "stable-24_05"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+[[ports]]
+localPort = 5000
+externalPort = 80
 
-      - name: Install Dependencies
-        run: npm install
+[env]
+PORT = "5000"
 
-      - name: Build Web Project
-        run: npm run build
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "build"]
 
-      - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+[workflows]
+runButton = "Project"
 
-      - name: Initialize Capacitor
-        run: npx cap init ChatDanis com.danis.chat --web-dir=dist
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
 
-      - name: Add Android Platform
-        run: npx cap add android
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
 
-      - name: Sync Code to Android
-        run: npx cap sync
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Build APK with Gradle
-        run: |
-          cd android
-          ./gradlew assembleDebug
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ChatDanis-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+waitForPort = 5000
