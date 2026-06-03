@@ -14,8 +14,8 @@ declare module "express-session" {
 }
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_KEY ? undefined : process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
 const PAYPAL_VIDEO_PRICE = "10.00";
@@ -168,13 +168,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
       const MODEL_MAP: Record<string, string> = {
-        fast:  "gpt-4o-mini",
-        normal: "gpt-4o",
-        think: "o4-mini",
-        pro:   "gpt-5.2",
+        fast:   "llama-3.1-8b-instant",
+        normal: "llama-3.3-70b-versatile",
+        think:  "deepseek-r1-distill-llama-70b",
+        pro:    "llama-3.3-70b-versatile",
       };
-      let model = MODEL_MAP[modelKey || "normal"] || "gpt-4o";
-      if (imgs.length > 0 && model === "o4-mini") model = "gpt-4o";
+      let model = MODEL_MAP[modelKey || "normal"] || "llama-3.3-70b-versatile";
+      if (imgs.length > 0) model = "llama-3.3-70b-versatile";
 
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
@@ -236,15 +236,8 @@ OPENS APPS TAGS LIST...`,
           },
           ...chatMessages.map((m) => {
             const imgRegex = /!\[\]\((data:image[^)]+)\)/g;
-            const matches = Array.from(m.content.matchAll(imgRegex)).map((mt) => mt[1]);
-            if (m.role === "user" && matches.length > 0) {
-              const text = m.content.replace(imgRegex, "").trim();
-              const parts: any[] = [];
-              if (text) parts.push({ type: "text", text });
-              for (const url of matches) parts.push({ type: "image_url", image_url: { url } });
-              return { role: "user" as const, content: parts };
-            }
-            return { role: m.role as "user" | "assistant", content: m.content };
+            const cleanContent = m.content.replace(imgRegex, "[imagen]").trim();
+            return { role: m.role as "user" | "assistant", content: cleanContent };
           }),
         ],
         stream: true,

@@ -4,8 +4,8 @@ import OpenAI from "openai";
 import { ensureCompatibleFormat, speechToText } from "./replit_integrations/audio/client";
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_KEY ? undefined : process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
 const liveBodyParser = express.json({ limit: "50mb" });
@@ -78,30 +78,11 @@ export function registerLiveChatRoutes(app: Express) {
       }));
 
       const textResp = await openai.chat.completions.create({
-        model: "gpt-5.2",
-        messages: [systemMsg, ...historyMsgs, { role: "user", content: userContent as any }],
+        model: "llama-3.3-70b-versatile",
+        messages: [systemMsg, ...historyMsgs, { role: "user", content: userText }],
       });
       const assistantText = textResp.choices[0]?.message?.content?.toString().trim() || "";
       res.write(`data: ${JSON.stringify({ type: "transcript", data: assistantText })}\n\n`);
-
-      const audioStream = await openai.chat.completions.create({
-        model: "gpt-audio",
-        modalities: ["text", "audio"],
-        audio: { voice, format: "pcm16" },
-        messages: [
-          { role: "system", content: "Repite el siguiente texto exactamente, con tono natural y amigable." },
-          { role: "user", content: assistantText || "..." },
-        ],
-        stream: true,
-      });
-
-      for await (const chunk of audioStream) {
-        const delta = chunk.choices?.[0]?.delta as any;
-        if (delta?.audio?.data) {
-          res.write(`data: ${JSON.stringify({ type: "audio", data: delta.audio.data })}\n\n`);
-        }
-      }
-
       res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantText })}\n\n`);
       res.end();
     } catch (e: any) {
