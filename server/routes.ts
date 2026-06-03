@@ -190,17 +190,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         res.setHeader("Connection", "keep-alive");
         res.write(`data: ${JSON.stringify({ content: "⏳ Generando imagen..." })}\n\n`);
         try {
-          const imgRes = await openai.images.generate({
-            model: "gpt-image-1",
-            prompt: content,
-            n: 1,
-            size: "1024x1024",
-            quality: "medium",
-          } as any);
-          const imageBase64 = (imgRes.data?.[0] as any)?.b64_json;
-          if (!imageBase64) throw new Error("No image returned");
-          const dataUrl = `data:image/png;base64,${imageBase64}`;
-          const assistantContent = `![](${dataUrl})`;
+          const seed = Math.floor(Math.random() * 1000000);
+          const encodedPrompt = encodeURIComponent(content);
+          const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=false&seed=${seed}`;
+          const assistantContent = `![](${imageUrl})`;
           await storage.createMessage(conversationId, "assistant", assistantContent);
           res.write(`data: ${JSON.stringify({ replace: assistantContent })}\n\n`);
           res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -278,25 +271,16 @@ OPENS APPS TAGS LIST...`,
         await storage.createMessage(conversationId, "user", `🎨 Generar imagen: ${prompt}`);
       }
 
-      const response = await openai.images.generate({
-        model: "gpt-image-1",
-        prompt,
-        n: 1,
-        size: "1024x1024",
-        quality: "medium",
-      } as any);
-
-      const imageBase64 = response.data[0]?.b64_json;
-      if (!imageBase64) return res.status(500).json({ error: "No se pudo generar la imagen" });
-
-      const imageDataUrl = `data:image/png;base64,${imageBase64}`;
-      const markdownImage = `![Imagen generada: ${prompt}](${imageDataUrl})`;
+      const seed = Math.floor(Math.random() * 1000000);
+      const encodedPrompt = encodeURIComponent(prompt);
+      const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&enhance=false&seed=${seed}`;
+      const markdownImage = `![Imagen generada: ${prompt}](${imageUrl})`;
 
       if (conversationId) {
         await storage.createMessage(conversationId, "assistant", markdownImage);
       }
 
-      res.json({ imageUrl: imageDataUrl, markdown: markdownImage });
+      res.json({ imageUrl, markdown: markdownImage });
     } catch (error) {
       console.error("Image gen error:", error);
       res.status(500).json({ error: "Error al generar la imagen" });
