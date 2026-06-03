@@ -2,10 +2,13 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { registerRoutes } from "./routes";
 import { createServer } from "http";
 import { serveStatic } from "./static";
+import { getSession } from "./replit_integrations/auth/replitAuth";
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(getSession());
 
 console.log("🚀 INICIANDO PROCESO DE ARRANQUE DEL SERVIDOR...");
 
