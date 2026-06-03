@@ -4,8 +4,8 @@ import OpenAI from "openai";
 import { ensureCompatibleFormat, speechToText } from "./replit_integrations/audio/client";
 
 const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+  apiKey: process.env.OPENAI_API_KEY || process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_API_KEY ? undefined : process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
 });
 
 const liveBodyParser = express.json({ limit: "50mb" });
