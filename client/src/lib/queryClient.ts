@@ -1,5 +1,8 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// URL activa de tu Replit vinculada directamente para el APK
+const BASE_URL = "https://chatdanid--denismejias127.replit.app";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,11 +15,12 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+  
+  const res = await fetch(`${BASE_URL}${cleanUrl}`, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -29,9 +33,10 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/"), {
-      credentials: "include",
-    });
+    const path = queryKey.join("/");
+    const cleanUrl = path.startsWith("/") ? path : `/${path}`;
+
+    const res = await fetch(`${BASE_URL}${cleanUrl}`);
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
