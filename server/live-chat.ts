@@ -8,7 +8,7 @@ async function callPollinations(messages: PMsg[]): Promise<string> {
   const resp = await fetch(POLLINATIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, model: "openai-large", stream: false }),
+    body: JSON.stringify({ messages, model: "openai", stream: false }),
   });
   if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
   const data = await resp.json() as any;

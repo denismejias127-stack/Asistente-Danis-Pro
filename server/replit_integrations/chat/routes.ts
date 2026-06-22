@@ -7,7 +7,7 @@ async function* streamPollinations(messages: PMsg[]): AsyncGenerator<string> {
   const resp = await fetch(POLLINATIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, model: "openai-large", stream: true, seed: Math.floor(Math.random() * 99999) }),
+    body: JSON.stringify({ messages, model: "openai", stream: true, seed: Math.floor(Math.random() * 99999) }),
   });
   if (!resp.ok || !resp.body) throw new Error(`Pollinations error: ${resp.status}`);
   const reader = resp.body.getReader();

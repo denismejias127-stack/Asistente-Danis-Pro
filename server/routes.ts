@@ -15,7 +15,7 @@ const POLLINATIONS_URL = "https://text.pollinations.ai/";
 
 type PollinationsMsg = { role: "system" | "user" | "assistant"; content: string };
 
-async function* streamPollinations(messages: PollinationsMsg[], model = "openai-large"): AsyncGenerator<string> {
+async function* streamPollinations(messages: PollinationsMsg[], model = "openai"): AsyncGenerator<string> {
   const resp = await fetch(POLLINATIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -45,9 +45,9 @@ async function* streamPollinations(messages: PollinationsMsg[], model = "openai-
 
 const MODEL_MAP: Record<string, string> = {
   fast:   "openai",
-  normal: "openai-large",
-  think:  "openai-large",
-  pro:    "openai-large",
+  normal: "openai",
+  think:  "openai",
+  pro:    "openai",
 };
 
 const PAYPAL_VIDEO_PRICE = "10.00";
@@ -199,7 +199,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const imgs: string[] = Array.isArray(images) ? images.filter((s) => typeof s === "string" && s.startsWith("data:image")) : [];
       if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
-      const model = MODEL_MAP[modelKey || "normal"] || "openai-large";
+      const model = MODEL_MAP[modelKey || "normal"] || "openai";
 
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
