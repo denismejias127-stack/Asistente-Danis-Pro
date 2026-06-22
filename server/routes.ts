@@ -195,7 +195,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!userId) return;
     try {
       const conversationId = parseInt(req.params.id);
-      const { content, model: modelKey, images } = req.body as { content: string; model?: string; images?: string[] };
+      const { content, model: modelKey, images, userName } = req.body as { content: string; model?: string; images?: string[]; userName?: string };
       const imgs: string[] = Array.isArray(images) ? images.filter((s) => typeof s === "string" && s.startsWith("data:image")) : [];
       if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
@@ -243,7 +243,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis. Always respond in the same language the user writes in. When the user pastes HTML, CSS, or any code and asks you to improve or modify it, return the complete improved code inside a proper markdown code block with the correct language tag (e.g. \`\`\`html). Always return full working code, never partial snippets. Use markdown when helpful.`;
+      const userNameLine = userName ? ` The user's name is "${userName}" — address them by name naturally and warmly.` : "";
+      const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis.${userNameLine} Always respond in the same language the user writes in. When the user asks you to write or generate code in any programming language (Python, JavaScript, HTML, CSS, Java, C++, SQL, etc.), always return complete, working code inside a proper markdown code block with the correct language tag (e.g. \`\`\`python, \`\`\`javascript, \`\`\`html). When the user pastes code and asks you to improve or modify it, return the complete improved code. Always return full working code, never partial snippets. Use markdown formatting when helpful (lists, bold, headers). Be conversational and friendly.`;
 
       const imgRegex = /!\[\]\((data:image[^)]+|https?:[^)]+)\)/g;
       const pollinationsMsgs: PollinationsMsg[] = [

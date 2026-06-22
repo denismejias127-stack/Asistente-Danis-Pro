@@ -4,6 +4,7 @@ import { MarkdownRenderer } from "./markdown-renderer";
 import { Bot, User, Volume2, VolumeX, ExternalLink, Share2, Download, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getVoiceSettings, VOICE_PROFILES } from "@/hooks/use-voice-settings";
 
 interface MessageBubbleProps {
   message: UIMessage;
@@ -17,7 +18,7 @@ function stripMarkdown(text: string): string {
     .replace(/#{1,6}\s/g, "")
     .replace(/\*\*(.+?)\*\*/g, "$1")
     .replace(/\*(.+?)\*/g, "$1")
-    .replace(/`{1,3}[^`]*`{1,3}/g, "")
+    .replace(/`{1,3}[^`]*`{1,3}/g, "código")
     .replace(/>\s.+/g, "")
     .replace(/[-*+]\s/g, "")
     .replace(/\n+/g, " ")
@@ -44,6 +45,20 @@ function downloadImage(dataUrl: string) {
   a.click();
 }
 
+function pickVoice(voices: SpeechSynthesisVoice[], preferFemale: boolean, preferLang: string): SpeechSynthesisVoice | null {
+  const langVoices = voices.filter((v) => v.lang.startsWith(preferLang));
+  if (langVoices.length === 0) return voices[0] || null;
+
+  const genderHint = preferFemale
+    ? ["female", "mujer", "woman", "femenina", "maria", "elena", "isabel", "lucia", "paulina", "sabina", "ines"]
+    : ["male", "hombre", "man", "masculino", "jorge", "carlos", "diego", "antonio", "pablo", "juan"];
+
+  const matched = langVoices.find((v) =>
+    genderHint.some((hint) => v.name.toLowerCase().includes(hint))
+  );
+  return matched || langVoices[0];
+}
+
 export const MessageBubble = memo(function MessageBubble({ message, onRegenerate }: MessageBubbleProps) {
   const isUser = message.role === "user";
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -52,7 +67,6 @@ export const MessageBubble = memo(function MessageBubble({ message, onRegenerate
   const { cleanContent, url } = parseOpenUrl(message.content);
   const generatedImage = !isUser ? extractGeneratedImage(cleanContent) : null;
 
-  // Auto-open URL once when the message is complete (not streaming)
   useEffect(() => {
     if (!isUser && url && !message.isStreaming && !opened) {
       setOpened(true);
@@ -69,24 +83,41 @@ export const MessageBubble = memo(function MessageBubble({ message, onRegenerate
       return;
     }
 
+    const voiceSettings = getVoiceSettings();
+    if (!voiceSettings.enabled) return;
+
+    const profileConfig = VOICE_PROFILES[voiceSettings.profile];
     const text = stripMarkdown(cleanContent);
+    if (!text) return;
+
     const utterance = new SpeechSynthesisUtterance(text);
 
+    const applyVoice = () => {
+      const voices = window.speechSynthesis.getVoices();
+      const chosen = pickVoice(voices, profileConfig.preferFemale, profileConfig.preferLang);
+      if (chosen) utterance.voice = chosen;
+
+      utterance.rate = profileConfig.rate;
+      utterance.pitch = profileConfig.pitch;
+      utterance.volume = 1.0;
+      utterance.lang = chosen?.lang || "es-ES";
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    };
+
     const voices = window.speechSynthesis.getVoices();
-    const spanishVoice = voices.find(
-      (v) => v.lang.startsWith("es") || v.name.toLowerCase().includes("spanish")
-    );
-    if (spanishVoice) utterance.voice = spanishVoice;
-
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
+    if (voices.length > 0) {
+      applyVoice();
+    } else {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.onvoiceschanged = null;
+        applyVoice();
+      };
+    }
   }, [cleanContent, isSpeaking]);
 
   return (
@@ -167,7 +198,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRegenerate
             <span className="inline-block w-2 h-4 ml-1 bg-primary/50 animate-pulse align-middle" />
           )}
 
-          {/* Action buttons — only on assistant messages, not while streaming */}
+          {/* Action buttons */}
           {!isUser && !message.isStreaming && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <button

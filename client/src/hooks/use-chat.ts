@@ -4,6 +4,7 @@ import { api, buildUrl } from "@shared/routes";
 import { useCreateConversation } from "./use-conversations";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { getUserName } from "./use-voice-settings";
 
 // Local representation of a message to blend DB state with streaming state
 export type UIMessage = {
@@ -51,7 +52,7 @@ export function useChatStream(conversationId?: number) {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, model, images }),
+        body: JSON.stringify({ content, model, images, userName: getUserName() }),
       });
 
       if (!response.ok) {
