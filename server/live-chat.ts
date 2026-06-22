@@ -3,10 +3,16 @@ import express from "express";
 import OpenAI from "openai";
 import { ensureCompatibleFormat, speechToText } from "./replit_integrations/audio/client";
 
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return _openai;
+}
 
 const liveBodyParser = express.json({ limit: "50mb" });
 
@@ -77,7 +83,7 @@ export function registerLiveChatRoutes(app: Express) {
         content: t.content,
       }));
 
-      const textResp = await openai.chat.completions.create({
+      const textResp = await getOpenAI().chat.completions.create({
         model: "llama-3.3-70b-versatile",
         messages: [systemMsg, ...historyMsgs, { role: "user", content: userText }],
       });
