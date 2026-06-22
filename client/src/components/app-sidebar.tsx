@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Settings, User2 } from "lucide-react";
+import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Settings, User2, Play } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
@@ -157,42 +157,79 @@ export function AppSidebar() {
 
           {/* Voice Profile */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground">
-              🔊 Voz de la IA
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-muted-foreground">🔊 Voz de la IA</label>
+              <button
+                onClick={() => updateSettings({ enabled: !settings.enabled })}
+                className={`relative w-8 h-4 rounded-full transition-colors ${settings.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+                data-testid="toggle-voice-enabled"
+                title={settings.enabled ? "Desactivar voz" : "Activar voz"}
+              >
+                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${settings.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+              </button>
+            </div>
             <div className="grid grid-cols-3 gap-1.5">
               {(Object.keys(VOICE_PROFILES) as VoiceProfile[]).map((key) => {
                 const profile = VOICE_PROFILES[key];
                 const isActive = settings.profile === key;
                 return (
-                  <button
-                    key={key}
-                    onClick={() => updateSettings({ profile: key, enabled: true })}
-                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-medium transition-all ${
-                      isActive
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                    }`}
-                    data-testid={`button-voice-${key}`}
-                  >
-                    <span className="text-base">{profile.emoji}</span>
-                    <span>{profile.label}</span>
-                  </button>
+                  <div key={key} className="relative">
+                    <button
+                      onClick={() => updateSettings({ profile: key, enabled: true })}
+                      className={`w-full flex flex-col items-center gap-1 py-2 px-1 rounded-xl border text-xs font-medium transition-all ${
+                        isActive
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                      }`}
+                      data-testid={`button-voice-${key}`}
+                    >
+                      <span className="text-base">{profile.emoji}</span>
+                      <span>{profile.label}</span>
+                    </button>
+                    {/* Test button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!window.speechSynthesis) return;
+                        window.speechSynthesis.cancel();
+                        const u = new SpeechSynthesisUtterance(`Hola, esta es la voz ${profile.label}`);
+                        u.rate = profile.rate;
+                        u.pitch = profile.pitch;
+                        u.volume = 1.0;
+                        const setV = () => {
+                          const voices = window.speechSynthesis.getVoices();
+                          const langVoices = voices.filter(v => v.lang.startsWith("es"));
+                          const pool = langVoices.length > 0 ? langVoices : voices;
+                          const femaleH = ["female","mujer","woman","maria","elena","isabel","lucia","paulina","sabina","ines","camila","valentina","sofia"];
+                          const maleH   = ["male","hombre","man","jorge","carlos","diego","antonio","pablo","juan","miguel"];
+                          let chosen: SpeechSynthesisVoice | undefined;
+                          if (key === "joven" || profile.preferFemale) {
+                            chosen = pool.find(v => femaleH.some(h => v.name.toLowerCase().includes(h)));
+                          } else {
+                            chosen = pool.find(v => maleH.some(h => v.name.toLowerCase().includes(h)));
+                          }
+                          if (!chosen) chosen = pool[0];
+                          if (chosen) u.voice = chosen;
+                          u.lang = chosen?.lang || "es-ES";
+                          window.speechSynthesis.speak(u);
+                        };
+                        const voices = window.speechSynthesis.getVoices();
+                        if (voices.length > 0) setV();
+                        else { window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; setV(); }; }
+                      }}
+                      className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center hover:bg-primary hover:text-white hover:border-primary transition-colors"
+                      title={`Probar voz ${profile.label}`}
+                      data-testid={`button-test-voice-${key}`}
+                    >
+                      <Play className="w-2.5 h-2.5 fill-current" />
+                    </button>
+                  </div>
                 );
               })}
             </div>
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={() => updateSettings({ enabled: !settings.enabled })}
-                className={`relative w-8 h-4 rounded-full transition-colors ${settings.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
-                data-testid="toggle-voice-enabled"
-              >
-                <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${settings.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
-              </button>
-              <span className="text-xs text-muted-foreground">
-                {settings.enabled ? "Voz activada" : "Voz desactivada"}
-              </span>
-            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Toca ▶ para escuchar cada voz. La IA leerá en voz alta cuando uses el micrófono.
+            </p>
           </div>
         </div>
       )}
