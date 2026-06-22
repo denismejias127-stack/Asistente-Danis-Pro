@@ -1,11 +1,31 @@
 import type { Express, Request, Response } from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { chatStorage } from "./storage";
 
-let _genAI: GoogleGenerativeAI | null = null;
-function getGenAI(): GoogleGenerativeAI {
-  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-  return _genAI;
+const POLLINATIONS_URL = "https://text.pollinations.ai/";
+type PMsg = { role: "system" | "user" | "assistant"; content: string };
+async function* streamPollinations(messages: PMsg[]): AsyncGenerator<string> {
+  const resp = await fetch(POLLINATIONS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, model: "openai-large", stream: true, seed: Math.floor(Math.random() * 99999) }),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`Pollinations error: ${resp.status}`);
+  const reader = resp.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const d = line.slice(6).trim();
+      if (d === "[DONE]") return;
+      try { const t = JSON.parse(d)?.choices?.[0]?.delta?.content; if (t) yield t; } catch { /* skip */ }
+    }
+  }
 }
 
 export function registerChatRoutes(app: Express): void {
@@ -81,23 +101,15 @@ export function registerChatRoutes(app: Express): void {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const history = chatMessages.slice(0, -1).map((m) => ({
-        role: m.role === "assistant" ? "model" as const : "user" as const,
-        parts: [{ text: m.content }],
-      }));
-      const lastMsg = chatMessages[chatMessages.length - 1];
-      const geminiModel = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash" });
-      const chat = geminiModel.startChat({ history });
-      const streamResult = await chat.sendMessageStream(lastMsg?.content || "");
+      const msgs: PMsg[] = [
+        { role: "system", content: "You are ChatDanis, a helpful AI assistant created by Danis. Respond in the same language the user writes in." },
+        ...chatMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ];
 
       let fullResponse = "";
-
-      for await (const chunk of streamResult.stream) {
-        const text = chunk.text();
-        if (text) {
-          fullResponse += text;
-          res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
-        }
+      for await (const text of streamPollinations(msgs)) {
+        fullResponse += text;
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
       }
 
       // Save assistant message

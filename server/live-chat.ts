@@ -1,12 +1,18 @@
 import type { Express } from "express";
 import express from "express";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ensureCompatibleFormat, speechToText } from "./replit_integrations/audio/client";
 
-let _genAI: GoogleGenerativeAI | null = null;
-function getGenAI(): GoogleGenerativeAI {
-  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
-  return _genAI;
+const POLLINATIONS_URL = "https://text.pollinations.ai/";
+type PMsg = { role: "system" | "user" | "assistant"; content: string };
+async function callPollinations(messages: PMsg[]): Promise<string> {
+  const resp = await fetch(POLLINATIONS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages, model: "openai-large", stream: false }),
+  });
+  if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
+  const data = await resp.json() as any;
+  return data?.choices?.[0]?.message?.content || data?.text || "";
 }
 
 const liveBodyParser = express.json({ limit: "50mb" });
@@ -78,17 +84,12 @@ export function registerLiveChatRoutes(app: Express) {
         content: t.content,
       }));
 
-      const geminiModel = getGenAI().getGenerativeModel({
-        model: "gemini-2.0-flash",
-        systemInstruction: systemMsg.content,
-      });
-      const geminiHistory = historyMsgs.map((t) => ({
-        role: t.role === "assistant" ? "model" as const : "user" as const,
-        parts: [{ text: t.content }],
-      }));
-      const chat = geminiModel.startChat({ history: geminiHistory });
-      const geminiResp = await chat.sendMessage(userText);
-      const assistantText = geminiResp.response.text().trim();
+      const msgs: PMsg[] = [
+        systemMsg,
+        ...historyMsgs.map((t) => ({ role: t.role as "user" | "assistant", content: t.content })),
+        { role: "user", content: userText },
+      ];
+      const assistantText = (await callPollinations(msgs)).trim();
       res.write(`data: ${JSON.stringify({ type: "transcript", data: assistantText })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantText })}\n\n`);
       res.end();
