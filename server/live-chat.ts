@@ -1,17 +1,12 @@
 import type { Express } from "express";
 import express from "express";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ensureCompatibleFormat, speechToText } from "./replit_integrations/audio/client";
 
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    });
-  }
-  return _openai;
+let _genAI: GoogleGenerativeAI | null = null;
+function getGenAI(): GoogleGenerativeAI {
+  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+  return _genAI;
 }
 
 const liveBodyParser = express.json({ limit: "50mb" });
@@ -83,11 +78,17 @@ export function registerLiveChatRoutes(app: Express) {
         content: t.content,
       }));
 
-      const textResp = await getOpenAI().chat.completions.create({
-        model: "llama-3.3-70b-versatile",
-        messages: [systemMsg, ...historyMsgs, { role: "user", content: userText }],
+      const geminiModel = getGenAI().getGenerativeModel({
+        model: "gemini-2.0-flash",
+        systemInstruction: systemMsg.content,
       });
-      const assistantText = textResp.choices[0]?.message?.content?.toString().trim() || "";
+      const geminiHistory = historyMsgs.map((t) => ({
+        role: t.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: t.content }],
+      }));
+      const chat = geminiModel.startChat({ history: geminiHistory });
+      const geminiResp = await chat.sendMessage(userText);
+      const assistantText = geminiResp.response.text().trim();
       res.write(`data: ${JSON.stringify({ type: "transcript", data: assistantText })}\n\n`);
       res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantText })}\n\n`);
       res.end();

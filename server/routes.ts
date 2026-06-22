@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { registerAudioRoutes } from "./replit_integrations/audio/routes";
 import { registerLiveChatRoutes } from "./live-chat";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 // Extend session type
 declare module "express-session" {
@@ -13,16 +13,18 @@ declare module "express-session" {
   }
 }
 
-let _openai: OpenAI | null = null;
-function getOpenAI(): OpenAI {
-  if (!_openai) {
-    _openai = new OpenAI({
-      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-    });
-  }
-  return _openai;
+let _genAI: GoogleGenerativeAI | null = null;
+function getGenAI(): GoogleGenerativeAI {
+  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+  return _genAI;
 }
+
+const GEMINI_MODEL_MAP: Record<string, string> = {
+  fast:   "gemini-2.0-flash",
+  normal: "gemini-2.0-flash",
+  think:  "gemini-2.5-flash-preview-05-20",
+  pro:    "gemini-2.5-flash-preview-05-20",
+};
 
 const PAYPAL_VIDEO_PRICE = "10.00";
 const PAYPAL_CURRENCY = "USD";
@@ -173,14 +175,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const imgs: string[] = Array.isArray(images) ? images.filter((s) => typeof s === "string" && s.startsWith("data:image")) : [];
       if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
-      const MODEL_MAP: Record<string, string> = {
-        fast:   "llama-3.1-8b-instant",
-        normal: "llama-3.3-70b-versatile",
-        think:  "deepseek-r1-distill-llama-70b",
-        pro:    "llama-3.3-70b-versatile",
-      };
-      let model = MODEL_MAP[modelKey || "normal"] || "llama-3.3-70b-versatile";
-      if (imgs.length > 0) model = "llama-3.3-70b-versatile";
+      let model = GEMINI_MODEL_MAP[modelKey || "normal"] || "gemini-2.0-flash";
 
       const conv = await storage.getConversation(conversationId, userId);
       if (!conv) return res.status(404).json({ error: "Conversación no encontrada" });
@@ -224,27 +219,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
-      const stream = await getOpenAI().chat.completions.create({
-        model,
-        messages: [
-          {
-            role: "system",
-            content: `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis. Always respond in the same language the user writes in. When the user pastes HTML, CSS, or any code and asks you to improve or modify it, return the complete improved code inside a proper markdown code block with the correct language tag (e.g. \`\`\`html). Always return full working code, never partial snippets. Use markdown when helpful.
+      const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis. Always respond in the same language the user writes in. When the user pastes HTML, CSS, or any code and asks you to improve or modify it, return the complete improved code inside a proper markdown code block with the correct language tag (e.g. \`\`\`html). Always return full working code, never partial snippets. Use markdown when helpful.`;
 
-OPENS APPS TAGS LIST...`,
-          },
-          ...chatMessages.map((m) => {
-            const imgRegex = /!\[\]\((data:image[^)]+)\)/g;
-            const cleanContent = m.content.replace(imgRegex, "[imagen]").trim();
-            return { role: m.role as "user" | "assistant", content: cleanContent };
-          }),
-        ],
-        stream: true,
+      const imgRegex = /!\[\]\((data:image[^)]+|https?:[^)]+)\)/g;
+      const history = chatMessages.slice(0, -1).map((m) => ({
+        role: m.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: m.content.replace(imgRegex, "[imagen]").trim() }],
+      }));
+      const lastMsg = chatMessages[chatMessages.length - 1];
+      const userText = lastMsg?.content.replace(imgRegex, "[imagen]").trim() || content;
+
+      const geminiModel = getGenAI().getGenerativeModel({
+        model,
+        systemInstruction: SYSTEM_PROMPT,
       });
+      const chat = geminiModel.startChat({ history });
+      const result = await chat.sendMessageStream(userText);
 
       let fullResponse = "";
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || "";
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
         if (text) {
           fullResponse += text;
           res.write(`data: ${JSON.stringify({ content: text })}\n\n`);

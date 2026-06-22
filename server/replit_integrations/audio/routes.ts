@@ -1,8 +1,15 @@
 import express, { type Express, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { openai, speechToText, ensureCompatibleFormat } from "./client";
+import { speechToText, ensureCompatibleFormat } from "./client";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const audioBodyParser = express.json({ limit: "50mb" });
+
+let _genAI: GoogleGenerativeAI | null = null;
+function getGenAI() {
+  if (!_genAI) _genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
+  return _genAI;
+}
 
 function getEffectiveUserId(req: any): string | null {
   return req.session?.userId ?? null;
@@ -15,7 +22,7 @@ export function registerAudioRoutes(app: Express): void {
       const userId = getEffectiveUserId(req);
       if (!userId) return res.status(401).json({ error: "No autenticado" });
 
-      const { audio, voice = "alloy" } = req.body;
+      const { audio } = req.body;
       if (!audio) return res.status(400).json({ error: "Se requieren datos de audio (base64)" });
 
       const conversation = await storage.getConversation(conversationId, userId);
@@ -28,34 +35,27 @@ export function registerAudioRoutes(app: Express): void {
       await storage.createMessage(conversationId, "user", userTranscript);
 
       const existingMessages = await storage.getMessagesByConversation(conversationId);
-      const chatHistory = [
-        { role: "system" as const, content: "You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis. Always respond in the same language the user speaks." },
-        ...existingMessages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-      ];
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       res.write(`data: ${JSON.stringify({ type: "user_transcript", data: userTranscript })}\n\n`);
 
-      const stream = await openai.chat.completions.create({
-        model: "gpt-audio",
-        modalities: ["text", "audio"],
-        audio: { voice, format: "pcm16" },
-        messages: chatHistory,
-        stream: true,
-      });
+      const SYSTEM = "You are ChatDanis, a helpful and friendly AI assistant created by Danis. Always respond in the same language the user speaks.";
+      const history = existingMessages.slice(0, -1).map((m) => ({
+        role: m.role === "assistant" ? "model" as const : "user" as const,
+        parts: [{ text: m.content }],
+      }));
+      const geminiModel = getGenAI().getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: SYSTEM });
+      const chat = geminiModel.startChat({ history });
+      const result = await chat.sendMessageStream(userTranscript);
 
       let assistantTranscript = "";
-      for await (const chunk of stream) {
-        const delta = chunk.choices?.[0]?.delta as any;
-        if (!delta) continue;
-        if (delta?.audio?.transcript) {
-          assistantTranscript += delta.audio.transcript;
-          res.write(`data: ${JSON.stringify({ type: "transcript", data: delta.audio.transcript })}\n\n`);
-        }
-        if (delta?.audio?.data) {
-          res.write(`data: ${JSON.stringify({ type: "audio", data: delta.audio.data })}\n\n`);
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
+        if (text) {
+          assistantTranscript += text;
+          res.write(`data: ${JSON.stringify({ type: "transcript", data: text })}\n\n`);
         }
       }
 
