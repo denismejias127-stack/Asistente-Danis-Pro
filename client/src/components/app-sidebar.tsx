@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
 import { useVoiceSettings, useUserName, VOICE_PROFILES, VoiceProfile } from "@/hooks/use-voice-settings";
+import { testVoiceProfile } from "@/lib/speak";
 import {
   Sidebar,
   SidebarContent,
@@ -21,31 +22,6 @@ import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
 
-function testVoice(key: VoiceProfile) {
-  if (!window.speechSynthesis) return;
-  const profile = VOICE_PROFILES[key];
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(`Hola, soy la voz ${profile.label}`);
-  u.rate = profile.rate;
-  u.pitch = profile.pitch;
-  u.volume = 1.0;
-  const apply = () => {
-    const voices = window.speechSynthesis.getVoices();
-    const pool = voices.filter(v => v.lang.startsWith("es"));
-    const all = pool.length > 0 ? pool : voices;
-    const femH = ["female","mujer","woman","maria","elena","isabel","lucia","paulina","sabina","ines","camila","valentina","sofia"];
-    const manH = ["male","hombre","man","jorge","carlos","diego","antonio","pablo","juan","miguel"];
-    let pick: SpeechSynthesisVoice | undefined;
-    if (key === "joven" || profile.preferFemale) pick = all.find(v => femH.some(h => v.name.toLowerCase().includes(h)));
-    else pick = all.find(v => manH.some(h => v.name.toLowerCase().includes(h)));
-    if (!pick) pick = all[0];
-    if (pick) u.voice = pick;
-    u.lang = pick?.lang || "es-ES";
-    window.speechSynthesis.speak(u);
-  };
-  if (window.speechSynthesis.getVoices().length > 0) apply();
-  else { window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.onvoiceschanged = null; apply(); }; }
-}
 
 export function AppSidebar() {
   const { data: conversations, isLoading } = useConversations();
@@ -203,7 +179,7 @@ export function AppSidebar() {
                   </button>
                   {/* Test voice button */}
                   <button
-                    onClick={() => testVoice(key)}
+                    onClick={() => testVoiceProfile(key, settings.volume)}
                     className="flex items-center justify-center gap-1 py-1 rounded-lg border border-sidebar-border text-[10px] text-sidebar-foreground/50 hover:text-sidebar-primary hover:border-sidebar-primary/50 hover:bg-sidebar-primary/5 transition-all active:scale-95"
                     data-testid={`button-test-voice-${key}`}
                     title={`Escuchar voz ${profile.label}`}

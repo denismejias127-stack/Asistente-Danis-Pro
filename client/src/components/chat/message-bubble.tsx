@@ -4,26 +4,13 @@ import { MarkdownRenderer } from "./markdown-renderer";
 import { Bot, User, Volume2, VolumeX, ExternalLink, Share2, Download, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { getVoiceSettings, VOICE_PROFILES } from "@/hooks/use-voice-settings";
+import { speakText, stopSpeaking, checkIsSpeaking, stripMarkdown } from "@/lib/speak";
 
 interface MessageBubbleProps {
   message: UIMessage;
   onRegenerate?: () => void;
 }
 
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/!\[.*?\]\(.*?\)/g, "imagen generada")
-    .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
-    .replace(/#{1,6}\s/g, "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/`{1,3}[^`]*`{1,3}/g, "código")
-    .replace(/>\s.+/g, "")
-    .replace(/[-*+]\s/g, "")
-    .replace(/\n+/g, " ")
-    .trim();
-}
 
 function parseOpenUrl(content: string): { cleanContent: string; url: string | null } {
   const match = content.match(/\[OPEN_URL:(https?:\/\/[^\]]+)\]/);
@@ -45,19 +32,6 @@ function downloadImage(dataUrl: string) {
   a.click();
 }
 
-function pickVoice(voices: SpeechSynthesisVoice[], preferFemale: boolean, preferLang: string): SpeechSynthesisVoice | null {
-  const langVoices = voices.filter((v) => v.lang.startsWith(preferLang));
-  if (langVoices.length === 0) return voices[0] || null;
-
-  const genderHint = preferFemale
-    ? ["female", "mujer", "woman", "femenina", "maria", "elena", "isabel", "lucia", "paulina", "sabina", "ines"]
-    : ["male", "hombre", "man", "masculino", "jorge", "carlos", "diego", "antonio", "pablo", "juan"];
-
-  const matched = langVoices.find((v) =>
-    genderHint.some((hint) => v.name.toLowerCase().includes(hint))
-  );
-  return matched || langVoices[0];
-}
 
 export const MessageBubble = memo(function MessageBubble({ message, onRegenerate }: MessageBubbleProps) {
   const isUser = message.role === "user";
@@ -75,49 +49,16 @@ export const MessageBubble = memo(function MessageBubble({ message, onRegenerate
   }, [isUser, url, message.isStreaming, opened]);
 
   const speak = useCallback(() => {
-    if (!window.speechSynthesis) return;
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      stopSpeaking();
       setIsSpeaking(false);
       return;
     }
-
-    const voiceSettings = getVoiceSettings();
-    if (!voiceSettings.enabled) return;
-
-    const profileConfig = VOICE_PROFILES[voiceSettings.profile];
-    const text = stripMarkdown(cleanContent);
-    if (!text) return;
-
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    const applyVoice = () => {
-      const voices = window.speechSynthesis.getVoices();
-      const chosen = pickVoice(voices, profileConfig.preferFemale, profileConfig.preferLang);
-      if (chosen) utterance.voice = chosen;
-
-      utterance.rate = profileConfig.rate;
-      utterance.pitch = profileConfig.pitch;
-      utterance.volume = voiceSettings.volume ?? 1.0;
-      utterance.lang = chosen?.lang || "es-ES";
-
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-
-      window.speechSynthesis.speak(utterance);
-    };
-
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      applyVoice();
-    } else {
-      window.speechSynthesis.onvoiceschanged = () => {
-        window.speechSynthesis.onvoiceschanged = null;
-        applyVoice();
-      };
-    }
+    speakText(
+      cleanContent,
+      () => setIsSpeaking(true),
+      () => setIsSpeaking(false),
+    );
   }, [cleanContent, isSpeaking]);
 
   return (

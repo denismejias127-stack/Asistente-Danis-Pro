@@ -9,73 +9,7 @@ import { ChatInput } from "@/components/chat/chat-input";
 import { PermissionBanner } from "@/components/permission-banner";
 import { Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
-import { getVoiceSettings, VOICE_PROFILES } from "@/hooks/use-voice-settings";
-
-function autoSpeak(text: string) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-
-  const voiceSettings = getVoiceSettings();
-  if (!voiceSettings.enabled) return;
-
-  const profileConfig = VOICE_PROFILES[voiceSettings.profile];
-
-  // Strip markdown
-  const clean = text
-    .replace(/!\[.*?\]\(.*?\)/g, "imagen")
-    .replace(/\[([^\]]+)\]\(.*?\)/g, "$1")
-    .replace(/#{1,6}\s/g, "")
-    .replace(/\*\*(.+?)\*\*/g, "$1")
-    .replace(/\*(.+?)\*/g, "$1")
-    .replace(/`{1,3}[^`]*`{1,3}/g, "código")
-    .replace(/>\s.+/g, "")
-    .replace(/[-*+]\s/g, "")
-    .replace(/\n+/g, " ")
-    .trim();
-
-  if (!clean) return;
-
-  const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.rate = profileConfig.rate;
-  utterance.pitch = profileConfig.pitch;
-  utterance.volume = voiceSettings.volume ?? 1.0;
-
-  const setVoiceAndSpeak = () => {
-    const voices = window.speechSynthesis.getVoices();
-    const langVoices = voices.filter(v => v.lang.startsWith(profileConfig.preferLang));
-    const pool = langVoices.length > 0 ? langVoices : voices;
-
-    const femaleHints = ["female","mujer","woman","femenina","maria","elena","isabel","lucia","paulina","sabina","ines","camila","valentina","sofia"];
-    const maleHints   = ["male","hombre","man","masculino","jorge","carlos","diego","antonio","pablo","juan","miguel","alejandro"];
-    const youngHints  = ["kid","child","young","teen","junior"];
-
-    let chosen: SpeechSynthesisVoice | undefined;
-
-    if (voiceSettings.profile === "joven") {
-      chosen = pool.find(v => youngHints.some(h => v.name.toLowerCase().includes(h)));
-      if (!chosen) chosen = pool.find(v => femaleHints.some(h => v.name.toLowerCase().includes(h)));
-    } else if (profileConfig.preferFemale) {
-      chosen = pool.find(v => femaleHints.some(h => v.name.toLowerCase().includes(h)));
-    } else {
-      chosen = pool.find(v => maleHints.some(h => v.name.toLowerCase().includes(h)));
-    }
-
-    if (!chosen) chosen = pool[0];
-    if (chosen) utterance.voice = chosen;
-    utterance.lang = chosen?.lang || "es-ES";
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) {
-    setVoiceAndSpeak();
-  } else {
-    window.speechSynthesis.onvoiceschanged = () => {
-      window.speechSynthesis.onvoiceschanged = null;
-      setVoiceAndSpeak();
-    };
-  }
-}
+import { speakText } from "@/lib/speak";
 
 export default function ChatPage() {
   const [, params] = useRoute("/c/:id");
@@ -114,7 +48,7 @@ export default function ChatPage() {
       const textToRead = lastStreamingRef.current;
       lastStreamingRef.current = "";
       if (textToRead) {
-        autoSpeak(textToRead);
+        speakText(textToRead);
       }
     }
   }, [isGenerating]);
