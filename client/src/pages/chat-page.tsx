@@ -38,7 +38,7 @@ function autoSpeak(text: string) {
   const utterance = new SpeechSynthesisUtterance(clean);
   utterance.rate = profileConfig.rate;
   utterance.pitch = profileConfig.pitch;
-  utterance.volume = 1.0;
+  utterance.volume = voiceSettings.volume ?? 1.0;
 
   const setVoiceAndSpeak = () => {
     const voices = window.speechSynthesis.getVoices();

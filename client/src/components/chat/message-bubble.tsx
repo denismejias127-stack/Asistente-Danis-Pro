@@ -99,7 +99,7 @@ export const MessageBubble = memo(function MessageBubble({ message, onRegenerate
 
       utterance.rate = profileConfig.rate;
       utterance.pitch = profileConfig.pitch;
-      utterance.volume = 1.0;
+      utterance.volume = voiceSettings.volume ?? 1.0;
       utterance.lang = chosen?.lang || "es-ES";
 
       utterance.onstart = () => setIsSpeaking(true);
