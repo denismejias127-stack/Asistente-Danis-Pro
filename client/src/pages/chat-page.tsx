@@ -89,12 +89,20 @@ export default function ChatPage() {
   const [chatModel, setChatModel] = useState<ChatModel>("normal");
   const voiceSentRef = useRef(false);
   const prevIsGeneratingRef = useRef(false);
+  const lastStreamingRef = useRef("");
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   }, [conversationData?.messages, streamingContent, optimisticUserMsg]);
+
+  // Capture streaming content before it clears
+  useEffect(() => {
+    if (streamingContent) {
+      lastStreamingRef.current = streamingContent;
+    }
+  }, [streamingContent]);
 
   // Auto-speak when AI finishes responding to a voice message
   useEffect(() => {
@@ -103,17 +111,13 @@ export default function ChatPage() {
 
     if (justFinished && voiceSentRef.current) {
       voiceSentRef.current = false;
-      // Small delay to let DB messages load
-      setTimeout(() => {
-        const msgs = conversationData?.messages;
-        if (!msgs || msgs.length === 0) return;
-        const last = msgs[msgs.length - 1];
-        if (last?.role === "assistant") {
-          autoSpeak(last.content);
-        }
-      }, 400);
+      const textToRead = lastStreamingRef.current;
+      lastStreamingRef.current = "";
+      if (textToRead) {
+        autoSpeak(textToRead);
+      }
     }
-  }, [isGenerating, conversationData?.messages]);
+  }, [isGenerating]);
 
   const messages: UIMessage[] = [
     ...(conversationData?.messages || []).map((m) => ({
