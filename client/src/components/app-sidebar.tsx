@@ -149,11 +149,11 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* ─── Voice + Name (always visible) ─── */}
-      <div className="px-4 pt-3 pb-2 border-t border-border space-y-3">
+      <div className="px-4 pt-3 pb-2 border-t border-sidebar-border space-y-3">
 
         {/* Name input */}
         <div className="space-y-1">
-          <label className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+          <label className="text-[11px] font-semibold text-sidebar-foreground/60 flex items-center gap-1">
             <User2 className="w-3 h-3" /> Tu nombre
           </label>
           <input
@@ -163,7 +163,7 @@ export function AppSidebar() {
             onBlur={handleNameSave}
             onKeyDown={(e) => { if (e.key === "Enter") { handleNameSave(); (e.target as HTMLInputElement).blur(); } }}
             placeholder="¿Cómo te llamas?"
-            className="w-full px-3 py-1.5 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="w-full px-3 py-1.5 text-sm rounded-lg border border-sidebar-border bg-sidebar-accent text-sidebar-foreground placeholder:text-sidebar-foreground/40 focus:outline-none focus:ring-2 focus:ring-sidebar-primary/40"
             data-testid="input-user-name"
           />
         </div>
@@ -171,11 +171,10 @@ export function AppSidebar() {
         {/* Voice selector */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-muted-foreground">🔊 Voz de la IA</span>
-            {/* ON/OFF toggle */}
+            <span className="text-[11px] font-semibold text-sidebar-foreground/60">🔊 Voz de la IA</span>
             <button
               onClick={() => updateSettings({ enabled: !settings.enabled })}
-              className={`relative w-9 h-5 rounded-full transition-colors ${settings.enabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+              className={`relative w-9 h-5 rounded-full transition-colors ${settings.enabled ? "bg-sidebar-primary" : "bg-sidebar-foreground/20"}`}
               data-testid="toggle-voice-enabled"
             >
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${settings.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
@@ -193,19 +192,19 @@ export function AppSidebar() {
                     onClick={() => updateSettings({ profile: key, enabled: true })}
                     className={`flex flex-col items-center gap-0.5 py-2.5 rounded-xl border text-xs font-semibold transition-all active:scale-95 ${
                       isActive
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border text-muted-foreground bg-muted/30 hover:border-primary/50 hover:text-foreground"
+                        ? "border-sidebar-primary bg-sidebar-primary/15 text-sidebar-primary shadow-sm"
+                        : "border-sidebar-border text-sidebar-foreground/70 bg-sidebar-accent hover:border-sidebar-primary/50 hover:text-sidebar-foreground"
                     }`}
                     data-testid={`button-voice-${key}`}
                   >
                     <span className="text-lg leading-none">{profile.emoji}</span>
                     <span className="text-[11px]">{profile.label}</span>
-                    {isActive && <span className="text-[9px] opacity-70">✓ activa</span>}
+                    {isActive && <span className="text-[9px] opacity-60">✓ activa</span>}
                   </button>
                   {/* Test voice button */}
                   <button
                     onClick={() => testVoice(key)}
-                    className="flex items-center justify-center gap-1 py-1 rounded-lg border border-border text-[10px] text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all active:scale-95"
+                    className="flex items-center justify-center gap-1 py-1 rounded-lg border border-sidebar-border text-[10px] text-sidebar-foreground/50 hover:text-sidebar-primary hover:border-sidebar-primary/50 hover:bg-sidebar-primary/5 transition-all active:scale-95"
                     data-testid={`button-test-voice-${key}`}
                     title={`Escuchar voz ${profile.label}`}
                   >
@@ -220,8 +219,8 @@ export function AppSidebar() {
           {/* Volume */}
           <div className="space-y-0.5 pt-0.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground">🔈 Volumen</span>
-              <span className="text-[10px] font-semibold">{Math.round(settings.volume * 100)}%</span>
+              <span className="text-[10px] text-sidebar-foreground/60">🔈 Volumen</span>
+              <span className="text-[10px] font-semibold text-sidebar-foreground">{Math.round(settings.volume * 100)}%</span>
             </div>
             <input
               type="range"
@@ -230,17 +229,17 @@ export function AppSidebar() {
               step={0.05}
               value={settings.volume}
               onChange={(e) => updateSettings({ volume: parseFloat(e.target.value) })}
-              className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-primary"
+              className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-sidebar-primary"
               data-testid="slider-volume"
             />
           </div>
         </div>
       </div>
 
-      <SidebarFooter className="p-3 border-t border-border">
+      <SidebarFooter className="p-3 border-t border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{name || user?.email || "Invitado"}</p>
+            <p className="text-sm font-medium truncate text-sidebar-foreground">{name || user?.email || "Invitado"}</p>
             {user?.isPro && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                 <Crown className="w-2.5 h-2.5 mr-0.5" />Pro
@@ -250,7 +249,7 @@ export function AppSidebar() {
           <Button
             variant="ghost"
             size="icon"
-            className="w-8 h-8 text-muted-foreground hover:text-foreground shrink-0"
+            className="w-8 h-8 text-sidebar-foreground/60 hover:text-sidebar-foreground shrink-0"
             onClick={() => logout()}
             title="Cerrar sesión"
             data-testid="button-logout"
