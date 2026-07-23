@@ -12,18 +12,22 @@ declare module "express-session" {
 }
 
 const POLLINATIONS_URL = "https://text.pollinations.ai/";
-const SE_TTS_URL = "https://api.streamelements.com/kappa/v2/speech";
-
-// Human-sounding TTS proxy (StreamElements / AWS Polly)
+// TTS proxy usando Google Translate (gratuito, sin autenticación)
+// voice param: "es" (mujer/joven) o "es" — idioma
 async function registerTTSRoute(app: Express) {
   app.get("/api/tts", async (req, res) => {
     try {
-      const { text, voice = "Lucia" } = req.query as { text?: string; voice?: string };
+      const { text } = req.query as { text?: string; voice?: string };
       if (!text) return res.status(400).json({ error: "No text" });
-      const safe = text.slice(0, 600);
-      const url = `${SE_TTS_URL}?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(safe)}`;
-      const upstream = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
-      if (!upstream.ok) throw new Error(`SE ${upstream.status}`);
+      const safe = text.slice(0, 200); // Google TTS tiene límite por URL
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safe)}&tl=es&client=tw-ob`;
+      const upstream = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "Referer": "https://translate.google.com/",
+        },
+      });
+      if (!upstream.ok) throw new Error(`Google TTS ${upstream.status}`);
       res.setHeader("Content-Type", "audio/mpeg");
       res.setHeader("Cache-Control", "public, max-age=86400");
       const buf = Buffer.from(await upstream.arrayBuffer());

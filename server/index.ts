@@ -46,11 +46,20 @@ const httpServer = createServer(app);
     }
 
     const port = parseInt(process.env.PORT || "5000", 10);
-    
+
     // Obligar a escuchar en '0.0.0.0' para acceso externo desde tu APK
     httpServer.listen(port, '0.0.0.0', () => {
       console.log(`[server] Chatdanis activo y sirviendo en el puerto ${port}`);
     });
+
+    // Cierre limpio para liberar el puerto al reiniciar
+    const shutdown = () => {
+      httpServer.close(() => process.exit(0));
+      setTimeout(() => process.exit(0), 3000);
+    };
+    process.on("SIGTERM", shutdown);
+    process.on("SIGINT", shutdown);
+
   } catch (error) {
     console.log("❌ ERROR CRÍTICO CAPTURADO EN EL ARRANQUE:");
     console.error(error);
