@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Play, User2 } from "lucide-react";
+import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Play, User2, Clapperboard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
@@ -74,6 +74,16 @@ export function AppSidebar() {
         >
           <Image className="w-3.5 h-3.5" />
           Generar imagen
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setLocation("/video")}
+          data-testid="button-video-mode"
+        >
+          <Clapperboard className="w-3.5 h-3.5" />
+          Generar video
         </Button>
       </SidebarHeader>
 

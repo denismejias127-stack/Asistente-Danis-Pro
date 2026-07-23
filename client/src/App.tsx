@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import ChatPage from "@/pages/chat-page";
 import LivePage from "@/pages/live-page";
+import VideoPage from "@/pages/video-page";
 import LoginPage from "@/pages/login";
 
 function AppContent() {
@@ -34,6 +35,7 @@ function AppContent() {
           <Route path="/" component={ChatPage} />
           <Route path="/c/:id" component={ChatPage} />
           <Route path="/live" component={LivePage} />
+          <Route path="/video" component={VideoPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
