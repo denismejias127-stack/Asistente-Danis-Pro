@@ -11,7 +11,6 @@ declare module "express-session" {
   }
 }
 
-const POLLINATIONS_URL = "https://text.pollinations.ai/";
 // TTS proxy usando Google Translate (gratuito, sin autenticación)
 // voice param: "es" (mujer/joven) o "es" — idioma
 async function registerTTSRoute(app: Express) {
@@ -39,15 +38,26 @@ async function registerTTSRoute(app: Express) {
   });
 }
 
-type PollinationsMsg = { role: "system" | "user" | "assistant"; content: string };
+type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
 
-async function* streamPollinations(messages: PollinationsMsg[], model = "openai"): AsyncGenerator<string> {
+const POLLINATIONS_URL = "https://text.pollinations.ai/";
+
+const MODEL_MAP: Record<string, string> = {
+  fast:   "openai-fast",
+  normal: "openai",
+  think:  "openai-large",
+  pro:    "openai-large",
+};
+
+// NOTE: Do NOT include a seed or api_key in the body — Pollinations treats
+// seeded requests as "authenticated" and applies the paid-tier quota.
+async function* streamChat(messages: ChatMsg[], model = "openai"): AsyncGenerator<string> {
   const resp = await fetch(POLLINATIONS_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, model, stream: true, seed: Math.floor(Math.random() * 99999) }),
+    body: JSON.stringify({ messages, model, stream: true }),
   });
-  if (!resp.ok || !resp.body) throw new Error(`Pollinations error: ${resp.status}`);
+  if (!resp.ok || !resp.body) throw new Error(`Chat API error: ${resp.status}`);
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -68,13 +78,6 @@ async function* streamPollinations(messages: PollinationsMsg[], model = "openai"
     }
   }
 }
-
-const MODEL_MAP: Record<string, string> = {
-  fast:   "openai",
-  normal: "openai",
-  think:  "openai",
-  pro:    "openai",
-};
 
 const PAYPAL_VIDEO_PRICE = "10.00";
 const PAYPAL_CURRENCY = "USD";
@@ -274,7 +277,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis.${userNameLine} Always respond in the same language the user writes in. When the user asks you to write or generate code in any programming language (Python, JavaScript, HTML, CSS, Java, C++, SQL, etc.), always return complete, working code inside a proper markdown code block with the correct language tag (e.g. \`\`\`python, \`\`\`javascript, \`\`\`html). When the user pastes code and asks you to improve or modify it, return the complete improved code. Always return full working code, never partial snippets. Use markdown formatting when helpful (lists, bold, headers). Be conversational and friendly.`;
 
       const imgRegex = /!\[\]\((data:image[^)]+|https?:[^)]+)\)/g;
-      const pollinationsMsgs: PollinationsMsg[] = [
+      const pollinationsMsgs: ChatMsg[] = [
         { role: "system", content: SYSTEM_PROMPT },
         ...chatMessages.map((m) => ({
           role: m.role as "user" | "assistant",
@@ -283,7 +286,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       ];
 
       let fullResponse = "";
-      for await (const text of streamPollinations(pollinationsMsgs, model)) {
+      for await (const text of streamChat(pollinationsMsgs, model)) {
         fullResponse += text;
         res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
       }
@@ -458,6 +461,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!response.ok) {
         const body = await response.text();
         console.error("Replicate video error:", response.status, body);
+        if (response.status === 402) {
+          return res.status(402).json({ error: "Tu cuenta de Replicate no tiene crédito. Agrega saldo en replicate.com/account/billing para generar videos." });
+        }
         return res.status(500).json({ error: "Error al iniciar la generación de video" });
       }
 

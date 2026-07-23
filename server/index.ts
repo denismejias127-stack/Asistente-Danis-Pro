@@ -4,6 +4,7 @@ import { createServer } from "http";
 import cors from "cors";
 import { serveStatic } from "./static";
 import { getSession } from "./replit_integrations/auth/replitAuth";
+import { execSync } from "child_process";
 
 const app = express();
 
@@ -46,6 +47,10 @@ const httpServer = createServer(app);
     }
 
     const port = parseInt(process.env.PORT || "5000", 10);
+
+    // Liberar el puerto si está ocupado por un proceso anterior
+    try { execSync(`fuser -k ${port}/tcp 2>/dev/null || true`); } catch {}
+    await new Promise(r => setTimeout(r, 400));
 
     // Obligar a escuchar en '0.0.0.0' para acceso externo desde tu APK
     httpServer.listen(port, '0.0.0.0', () => {
