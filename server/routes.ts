@@ -44,9 +44,9 @@ const POLLINATIONS_URL = "https://text.pollinations.ai/";
 
 const MODEL_MAP: Record<string, string> = {
   fast:   "openai-fast",
-  normal: "openai",
-  think:  "openai-large",
-  pro:    "openai-large",
+  normal: "openai-fast",
+  think:  "openai-fast",
+  pro:    "openai-fast",
 };
 
 // NOTE: Do NOT include a seed or api_key in the body — Pollinations treats
