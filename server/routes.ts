@@ -18,7 +18,7 @@ async function registerTTSRoute(app: Express) {
     try {
       const { text } = req.query as { text?: string; voice?: string };
       if (!text) return res.status(400).json({ error: "No text" });
-      const safe = text.slice(0, 200); // Google TTS tiene límite por URL
+      const safe = text.slice(0, 200); // chunks already ≤180 chars from client
       const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safe)}&tl=es&client=tw-ob`;
       const upstream = await fetch(url, {
         headers: {
