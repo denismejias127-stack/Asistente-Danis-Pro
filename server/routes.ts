@@ -38,26 +38,52 @@ async function registerTTSRoute(app: Express) {
   });
 }
 
-type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
+type ChatMsg = { role: "user" | "assistant"; content: string };
 
-const POLLINATIONS_URL = "https://text.pollinations.ai/";
+// Gemini model — lite variant has the highest free-tier rate limits
+const GEMINI_MODEL = "gemini-flash-lite-latest";
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
+// MODEL_MAP kept for API compatibility (model selection UI), all map to Gemini
 const MODEL_MAP: Record<string, string> = {
-  fast:   "openai-fast",
-  normal: "openai-fast",
-  think:  "openai-fast",
-  pro:    "openai-fast",
+  fast:   GEMINI_MODEL,
+  normal: GEMINI_MODEL,
+  think:  GEMINI_MODEL,
+  pro:    GEMINI_MODEL,
 };
 
-// NOTE: Do NOT include a seed or api_key in the body — Pollinations treats
-// seeded requests as "authenticated" and applies the paid-tier quota.
-async function* streamChat(messages: ChatMsg[], model = "openai"): AsyncGenerator<string> {
-  const resp = await fetch(POLLINATIONS_URL, {
+async function* streamChat(
+  messages: ChatMsg[],
+  systemPrompt: string,
+  _model = GEMINI_MODEL
+): AsyncGenerator<string> {
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_API_KEY no configurada");
+
+  // Convert messages to Gemini format (role: "user" | "model")
+  const contents = messages.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
+  const body = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents,
+    generationConfig: { temperature: 0.9, maxOutputTokens: 2048 },
+  };
+
+  const url = `${GEMINI_BASE}/${GEMINI_MODEL}:streamGenerateContent?key=${apiKey}&alt=sse`;
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, model, stream: true }),
+    body: JSON.stringify(body),
   });
-  if (!resp.ok || !resp.body) throw new Error(`Chat API error: ${resp.status}`);
+
+  if (!resp.ok || !resp.body) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`Gemini API error: ${resp.status} ${errText.slice(0, 200)}`);
+  }
+
   const reader = resp.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -70,9 +96,10 @@ async function* streamChat(messages: ChatMsg[], model = "openai"): AsyncGenerato
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const d = line.slice(6).trim();
-      if (d === "[DONE]") return;
+      if (!d || d === "[DONE]") continue;
       try {
-        const text = JSON.parse(d)?.choices?.[0]?.delta?.content;
+        const chunk = JSON.parse(d);
+        const text = chunk?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) yield text;
       } catch { /* skip malformed chunk */ }
     }
@@ -277,16 +304,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis.${userNameLine} Always respond in the same language the user writes in. When the user asks you to write or generate code in any programming language (Python, JavaScript, HTML, CSS, Java, C++, SQL, etc.), always return complete, working code inside a proper markdown code block with the correct language tag (e.g. \`\`\`python, \`\`\`javascript, \`\`\`html). When the user pastes code and asks you to improve or modify it, return the complete improved code. Always return full working code, never partial snippets. Use markdown formatting when helpful (lists, bold, headers). Be conversational and friendly.`;
 
       const imgRegex = /!\[\]\((data:image[^)]+|https?:[^)]+)\)/g;
-      const pollinationsMsgs: ChatMsg[] = [
-        { role: "system", content: SYSTEM_PROMPT },
-        ...chatMessages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content.replace(imgRegex, "[imagen]").trim(),
-        })),
-      ];
+      const geminiMsgs: ChatMsg[] = chatMessages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content.replace(imgRegex, "[imagen]").trim(),
+      }));
 
       let fullResponse = "";
-      for await (const text of streamChat(pollinationsMsgs, model)) {
+      for await (const text of streamChat(geminiMsgs, SYSTEM_PROMPT, model)) {
         fullResponse += text;
         res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
       }
