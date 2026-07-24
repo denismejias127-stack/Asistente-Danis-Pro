@@ -24,12 +24,26 @@ export default function ChatPage() {
   const voiceSentRef = useRef(false);
   const prevIsGeneratingRef = useRef(false);
   const lastStreamingRef = useRef("");
+  const rafRef = useRef<number | null>(null);
 
+  // During streaming use instant scroll so rapid updates don't get stuck.
+  // After streaming finishes use smooth scroll for a nice transition.
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el) return;
+    if (isGenerating) {
+      // Cancel any pending RAF, then pin to bottom instantly every frame
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      const pin = () => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        rafRef.current = requestAnimationFrame(pin);
+      };
+      rafRef.current = requestAnimationFrame(pin);
+    } else {
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
-  }, [conversationData?.messages, streamingContent, optimisticUserMsg]);
+  }, [isGenerating, conversationData?.messages, optimisticUserMsg]);
 
   // Capture streaming content before it clears
   useEffect(() => {
