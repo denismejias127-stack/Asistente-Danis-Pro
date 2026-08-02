@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { conversations, messages, users, type User, type UpsertUser } from "@shared/schema";
+import { conversations, messages, users, userMemories, type User, type UpsertUser } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 
@@ -84,6 +84,29 @@ export class DatabaseStorage implements IStorage {
   async createMessage(conversationId: number, role: string, content: string) {
     const [message] = await db.insert(messages).values({ conversationId, role, content }).returning();
     return message;
+  }
+
+  // ── Long-term memory ──────────────────────────────────────────────────────
+  async getUserMemories(userId: string): Promise<{ key: string; value: string }[]> {
+    const rows = await db.select({ key: userMemories.key, value: userMemories.value })
+      .from(userMemories)
+      .where(eq(userMemories.userId, userId))
+      .orderBy(desc(userMemories.updatedAt));
+    return rows;
+  }
+
+  async upsertMemory(userId: string, key: string, value: string): Promise<void> {
+    await db.insert(userMemories)
+      .values({ userId, key, value })
+      .onConflictDoUpdate({
+        target: [userMemories.userId, userMemories.key],
+        set: { value, updatedAt: new Date() },
+      });
+  }
+
+  async deleteMemory(userId: string, key: string): Promise<void> {
+    await db.delete(userMemories)
+      .where(and(eq(userMemories.userId, userId), eq(userMemories.key, key)));
   }
 }
 
