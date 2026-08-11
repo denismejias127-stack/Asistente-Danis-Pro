@@ -1,4 +1,4 @@
-name: Generar APK de ChatDanis
+name: ChatDanis
 
 on:
   workflow_dispatch:
@@ -28,12 +28,14 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Sincronizar Capacitor (Configurado para dist/public)
+    - name: Sincronizar Capacitor
       run: |
         npm install -g @capacitor/cli
         npm install @capacitor/core @capacitor/android
-        # Le decimos explícitamente a Capacitor que busque los archivos en dist/public
-        npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public --overwrite
+        # Eliminamos configuración vieja si existe para evitar conflictos
+        rm -rf capacitor.config.json
+        # Inicializamos sin --overwrite
+        npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public
         npx cap add android
         npx cap sync
 
@@ -53,4 +55,3 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
-
