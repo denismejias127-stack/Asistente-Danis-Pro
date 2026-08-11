@@ -24,11 +24,11 @@ jobs:
         npm install
         npm run build --if-present
 
-    - name: Configurar entorno de Android (Java 17)
+    - name: Configurar entorno de Android (Java 21)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '17'
+        java-version: '21'
 
     - name: Inicializar Capacitor y Configurar Android
       run: |
@@ -38,11 +38,13 @@ jobs:
         npx cap add android
         npx cap sync
 
-    - name: Inyectar Permiso de Internet y Tráfico Libre en Android
+    - name: Inyectar Permisos (Internet, Cámara, Micrófono y Tráfico Libre)
       run: |
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET" \/>' android/app/src/main/AndroidManifest.xml
+        sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.CAMERA" \/>' android/app/src/main/AndroidManifest.xml
+        sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' android/app/src/main/AndroidManifest.xml
         sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-        echo "¡Permiso de Internet y Tráfico Libre inyectados con éxito!"
+        echo "¡Permisos de Internet, Cámara, Micrófono y Tráfico Libre inyectados con éxito!"
 
     - name: Forzar Versión de Kotlin y Resolver Conflictos de Gradle
       run: |
@@ -62,7 +64,7 @@ jobs:
 
     - name: Crear APK
       run: |
-        cd android && ./gradlew assembleDebug --stacktrace
+        cd android && ./gradlew assembleDebug --info --stacktrace
 
     - name: Subir APK como Artefacto
       uses: actions/upload-artifact@v4
