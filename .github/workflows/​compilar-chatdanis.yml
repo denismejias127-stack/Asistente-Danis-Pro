@@ -15,13 +15,10 @@ jobs:
       with:
         node-version: 22
 
-    - name: Limpiar y Forzar Registro Oficial
+    - name: Limpiar y Compilar
       run: |
-        # Eliminamos el archivo que apunta a la ruta local
-        rm -f package-lock.json
-        # Forzamos a npm a usar el registro oficial
         npm config set registry https://registry.npmjs.org/
-        npm cache clean --force
+        rm -f package-lock.json
         npm install
         npm run build --if-present
 
@@ -31,13 +28,14 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Sincronizar Capacitor
+    - name: Sincronizar Capacitor (Configurado para dist/public)
       run: |
         npm install -g @capacitor/cli
         npm install @capacitor/core @capacitor/android
-        # Sincronizamos después de haber instalado todo correctamente
+        # Le decimos explícitamente a Capacitor que busque los archivos en dist/public
+        npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public --overwrite
+        npx cap add android
         npx cap sync
-        npx cap copy
 
     - name: Inyectar Permisos y Configuración WebView
       run: |
@@ -55,3 +53,4 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
+
