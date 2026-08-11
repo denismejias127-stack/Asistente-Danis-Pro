@@ -64,4 +64,3 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
-
