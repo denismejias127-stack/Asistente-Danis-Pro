@@ -16,8 +16,9 @@ jobs:
       with:
         node-version: 22
 
-    - name: Instalar Dependencias y Compilar
+    - name: Limpiar Registro y Dependencias
       run: |
+        npm config set registry https://registry.npmjs.org/
         npm install
         npm run build --if-present
 
@@ -55,7 +56,6 @@ jobs:
             }
         }" >> android/build.gradle
         
-        # Asegurar permisos de ejecución para gradlew
         chmod +x android/gradlew
 
     - name: Crear APK
