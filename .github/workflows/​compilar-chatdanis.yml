@@ -21,11 +21,11 @@ jobs:
         npm install
         npm run build --if-present
 
-    - name: Configurar entorno de Android (Java 21)
+    - name: Configurar entorno de Android (Java 17)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '21'
+        java-version: '17'
 
     - name: Inicializar Capacitor y Configurar Android
       run: |
@@ -41,7 +41,7 @@ jobs:
         sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
         echo "¡Permiso de Internet y Tráfico Libre inyectados con éxito!"
 
-    - name: Forzar Versión de Kotlin (Evitar Clases Duplicadas)
+    - name: Forzar Versión de Kotlin y Resolver Conflictos de Gradle
       run: |
         echo "subprojects {
             configurations.all {
@@ -54,10 +54,13 @@ jobs:
                 }
             }
         }" >> android/build.gradle
+        
+        # Asegurar permisos de ejecución para gradlew
+        chmod +x android/gradlew
 
     - name: Crear APK
       run: |
-        cd android && ./gradlew assembleDebug
+        cd android && ./gradlew assembleDebug --stacktrace
 
     - name: Subir APK como Artefacto
       uses: actions/upload-artifact@v4
