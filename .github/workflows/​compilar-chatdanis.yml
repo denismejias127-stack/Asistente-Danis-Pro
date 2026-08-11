@@ -6,7 +6,6 @@ on:
 jobs:
   construir:
     runs-on: ubuntu-latest
-
     steps:
     - name: Configurar trabajo
       uses: actions/checkout@v4
@@ -16,12 +15,15 @@ jobs:
       with:
         node-version: 22
 
-    - name: Instalar, Compilar y Preparar Archivos
+    - name: Limpiar y Forzar Registro Oficial
       run: |
+        # Eliminamos el archivo que apunta a la ruta local
+        rm -f package-lock.json
+        # Forzamos a npm a usar el registro oficial
+        npm config set registry https://registry.npmjs.org/
+        npm cache clean --force
         npm install
         npm run build --if-present
-        # Aseguramos que la carpeta de salida exista
-        mkdir -p dist/public
 
     - name: Configurar entorno de Android (Java 21)
       uses: actions/setup-java@v4
@@ -29,15 +31,13 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Inicializar y Sincronizar Capacitor
+    - name: Sincronizar Capacitor
       run: |
         npm install -g @capacitor/cli
         npm install @capacitor/core @capacitor/android
-        # Forzamos la creación del proyecto Android sobre la base de tus archivos
-        npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public --overwrite
-        npx cap add android
-        npx cap copy
+        # Sincronizamos después de haber instalado todo correctamente
         npx cap sync
+        npx cap copy
 
     - name: Inyectar Permisos y Configuración WebView
       run: |
@@ -45,7 +45,7 @@ jobs:
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>' android/app/src/main/AndroidManifest.xml
         sed -i 's/<application/<application android:hardwareAccelerated="true" android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
 
-    - name: Corregir permisos de Gradle y compilar
+    - name: Crear APK
       run: |
         chmod +x android/gradlew
         cd android && ./gradlew assembleDebug
