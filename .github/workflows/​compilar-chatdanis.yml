@@ -1,4 +1,4 @@
-name: ChatDanis
+name: Generar APK de ChatDanis
 
 on:
   workflow_dispatch:
@@ -15,12 +15,14 @@ jobs:
       with:
         node-version: 22
 
-    - name: Limpiar y Compilar
+    - name: Compilar Web y Mover Archivos
       run: |
-        npm config set registry https://registry.npmjs.org/
-        rm -f package-lock.json
         npm install
         npm run build --if-present
+        # Creamos la estructura de Android manualmente
+        mkdir -p android/app/src/main/assets/public
+        # Copiamos todo lo de la web a la carpeta de assets
+        cp -r dist/public/* android/app/src/main/assets/public/
 
     - name: Configurar entorno de Android (Java 21)
       uses: actions/setup-java@v4
@@ -28,24 +30,14 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Sincronizar Capacitor
+    - name: Inyectar Permisos y WebView
       run: |
-        npm install -g @capacitor/cli
-        npm install @capacitor/core @capacitor/android
-        # Eliminamos configuración vieja si existe para evitar conflictos
-        rm -rf capacitor.config.json
-        # Inicializamos sin --overwrite
-        npx cap init "ChatDanis" "com.danis.chatdanis" --web-dir=dist/public
-        npx cap add android
-        npx cap sync
-
-    - name: Inyectar Permisos y Configuración WebView
-      run: |
+        # Inyectar permisos directamente en el Manifest
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>' android/app/src/main/AndroidManifest.xml
         sed -i 's/<application/<application android:hardwareAccelerated="true" android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
 
-    - name: Crear APK
+    - name: Crear APK (Forzado)
       run: |
         chmod +x android/gradlew
         cd android && ./gradlew assembleDebug
@@ -53,5 +45,5 @@ jobs:
     - name: Subir APK
       uses: actions/upload-artifact@v4
       with:
-        name: apk-nueva-danis
+        name: apk-final-completa
         path: android/app/build/outputs/apk/debug/app-debug.apk
