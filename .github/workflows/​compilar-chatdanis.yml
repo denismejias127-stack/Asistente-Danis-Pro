@@ -6,6 +6,7 @@ on:
 jobs:
   construir:
     runs-on: ubuntu-latest
+
     steps:
     - name: Configurar trabajo
       uses: actions/checkout@v4
@@ -15,7 +16,7 @@ jobs:
       with:
         node-version: 22
 
-    - name: Limpiar Caché y Forzar Registro Oficial
+    - name: Limpiar Caché y Forzar Registro
       run: |
         npm config set registry https://registry.npmjs.org/
         rm -f package-lock.json
@@ -37,17 +38,28 @@ jobs:
         npx cap add android
         npx cap sync
 
-    - name: Inyectar Permisos Completos y Configuración de Red
+    - name: Inyectar Permisos y Configuración de Red Avanzada
       run: |
-        # Inyectar permisos
+        # Añadir permisos
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.CAMERA" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' android/app/src/main/AndroidManifest.xml
         
-        # Configurar tráfico claro y hardware
+        # Configurar el WebView para permitir contenido mixto y aceleración
         sed -i 's/<application/<application android:hardwareAccelerated="true" android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-        echo "¡Permisos e inyección de hardware completados!"
+        
+        # Inyectar configuración de WebView en el archivo de actividad principal si existe
+        echo "import android.webkit.WebView;
+              public class MainActivity extends com.getcapacitor.BridgeActivity {
+                  @Override
+                  public void onStart() {
+                      super.onStart();
+                      bridge.getWebView().getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+                      bridge.getWebView().getSettings().setDomStorageEnabled(true);
+                  }
+              }" > android/app/src/main/java/com/danis/chatdanis/MainActivity.java
+        echo "¡Configuración de red y WebView inyectada!"
 
     - name: Forzar Versión de Kotlin y Resolver Conflictos de Gradle
       run: |
@@ -73,4 +85,3 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
-
