@@ -6,7 +6,6 @@ on:
 jobs:
   construir:
     runs-on: ubuntu-latest
-
     steps:
     - name: Configurar trabajo
       uses: actions/checkout@v4
@@ -38,13 +37,17 @@ jobs:
         npx cap add android
         npx cap sync
 
-    - name: Inyectar Permisos (Internet, Cámara, Micrófono y Tráfico Libre)
+    - name: Inyectar Permisos Completos y Configuración de Red
       run: |
+        # Inyectar permisos
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.INTERNET" \/>' android/app/src/main/AndroidManifest.xml
+        sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.CAMERA" \/>' android/app/src/main/AndroidManifest.xml
         sed -i '/<\/manifest>/i \    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>' android/app/src/main/AndroidManifest.xml
-        sed -i 's/<application/<application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
-        echo "¡Permisos de Internet, Cámara, Micrófono y Tráfico Libre inyectados con éxito!"
+        
+        # Configurar tráfico claro y hardware
+        sed -i 's/<application/<application android:hardwareAccelerated="true" android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
+        echo "¡Permisos e inyección de hardware completados!"
 
     - name: Forzar Versión de Kotlin y Resolver Conflictos de Gradle
       run: |
@@ -59,7 +62,6 @@ jobs:
                 }
             }
         }" >> android/build.gradle
-        
         chmod +x android/gradlew
 
     - name: Crear APK
@@ -71,3 +73,4 @@ jobs:
       with:
         name: apk-nueva-danis
         path: android/app/build/outputs/apk/debug/app-debug.apk
+
