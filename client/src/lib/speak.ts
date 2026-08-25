@@ -62,28 +62,41 @@ function splitIntoChunks(text: string, maxLen = 180): string[] {
 
 let currentAudio: HTMLAudioElement | null = null;
 let stopRequested = false;
+let speechRun = 0;
 
 export function stopSpeaking() {
   stopRequested = true;
+  speechRun++;
   if (currentAudio) {
     currentAudio.pause();
     currentAudio.src = "";
     currentAudio = null;
   }
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 }
 
 export function checkIsSpeaking(): boolean {
   return currentAudio !== null && !currentAudio.paused && !currentAudio.ended;
 }
 
-function createAudio(text: string, voice: string, volume: number): HTMLAudioElement {
+async function prepareAudio(text: string, voice: string, volume: number): Promise<{ audio: HTMLAudioElement; objectUrl: string } | null> {
   const url = `/api/tts?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
-  const audio = new Audio(url);
-  audio.preload = "auto";
-  audio.volume = volume;
-  // Start downloading immediately, while the previous chunk is playing.
-  audio.load();
-  return audio;
+  // Fetch the bytes ourselves so playback never depends on a network request
+  // starting between two chunks.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, { cache: "force-cache" });
+      if (!response.ok) throw new Error(`TTS ${response.status}`);
+      const objectUrl = URL.createObjectURL(await response.blob());
+      const audio = new Audio(objectUrl);
+      audio.preload = "auto";
+      audio.volume = volume;
+      return { audio, objectUrl };
+    } catch {
+      if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+  return null;
 }
 
 async function playPreparedAudio(audio: HTMLAudioElement): Promise<void> {
@@ -106,6 +119,18 @@ async function playPreparedAudio(audio: HTMLAudioElement): Promise<void> {
   });
 }
 
+function speakNative(text: string, volume: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (!("speechSynthesis" in window)) return resolve();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "es-HN";
+    utterance.volume = volume;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 export async function speakText(
   rawText: string,
   onStart?: () => void,
@@ -120,23 +145,35 @@ export async function speakText(
   const clean = stripMarkdown(rawText);
   if (!clean) return;
 
-  const chunks = splitIntoChunks(clean);
+  const chunks = splitIntoChunks(clean, 150);
   if (chunks.length === 0) return;
 
   const seVoice = VOICE_MAP[settings.profile];
   const volume = settings.volume ?? 1.0;
+  const run = ++speechRun;
 
   onStart?.();
 
-  // Download all pieces up front. Waiting to request the next piece until the
-  // previous one ends is what caused the noticeable pauses between sentences.
-  const audioQueue = chunks.map((chunk) => createAudio(chunk, seVoice, volume));
-  for (const audio of audioQueue) {
-    if (stopRequested) break;
-    await playPreparedAudio(audio);
+  // Keep only one request ahead. Loading every chunk at once can make the TTS
+  // service reject the final requests, which used to leave the last words out.
+  let nextAudio = prepareAudio(chunks[0], seVoice, volume);
+  for (let index = 0; index < chunks.length; index++) {
+    if (stopRequested || run !== speechRun) break;
+    const prepared = await nextAudio;
+    // Begin downloading the following piece while this one is playing.
+    if (index + 1 < chunks.length) {
+      nextAudio = prepareAudio(chunks[index + 1], seVoice, volume);
+    }
+    if (prepared) {
+      await playPreparedAudio(prepared.audio);
+      URL.revokeObjectURL(prepared.objectUrl);
+    } else {
+      // Never silently lose text: use the browser voice if TTS failed.
+      await speakNative(chunks[index], volume);
+    }
   }
 
-  onEnd?.();
+  if (run === speechRun) onEnd?.();
 }
 
 export async function testVoiceProfile(profile: VoiceProfile, volume = 1.0): Promise<void> {
