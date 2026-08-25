@@ -76,11 +76,18 @@ export function checkIsSpeaking(): boolean {
   return currentAudio !== null && !currentAudio.paused && !currentAudio.ended;
 }
 
-async function playChunk(text: string, voice: string, volume: number): Promise<void> {
+function createAudio(text: string, voice: string, volume: number): HTMLAudioElement {
+  const url = `/api/tts?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
+  const audio = new Audio(url);
+  audio.preload = "auto";
+  audio.volume = volume;
+  // Start downloading immediately, while the previous chunk is playing.
+  audio.load();
+  return audio;
+}
+
+async function playPreparedAudio(audio: HTMLAudioElement): Promise<void> {
   return new Promise((resolve) => {
-    const url = `/api/tts?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
-    const audio = new Audio(url);
-    audio.volume = volume;
     currentAudio = audio;
 
     audio.onended = () => {
@@ -121,9 +128,12 @@ export async function speakText(
 
   onStart?.();
 
-  for (const chunk of chunks) {
+  // Download all pieces up front. Waiting to request the next piece until the
+  // previous one ends is what caused the noticeable pauses between sentences.
+  const audioQueue = chunks.map((chunk) => createAudio(chunk, seVoice, volume));
+  for (const audio of audioQueue) {
     if (stopRequested) break;
-    await playChunk(chunk, seVoice, volume);
+    await playPreparedAudio(audio);
   }
 
   onEnd?.();
