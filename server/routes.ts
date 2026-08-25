@@ -300,6 +300,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
 
+      // Date/time questions are answered deterministically by the server.
+      // This prevents the language model from guessing based on its training date.
+      const asksDate = /\b(qué|que|cual|cuál)\s+(día|fecha)|\bfecha\s+(de\s+)?hoy\b|\bqué día es hoy\b|\bdía de hoy\b/i.test(content);
+      const asksTime = /\bhora(s)?\b/i.test(content);
+      if (asksDate || asksTime) {
+        const current = new Date();
+        const dateText = new Intl.DateTimeFormat("es-HN", {
+          timeZone: "America/Tegucigalpa",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }).format(current);
+        const timeText = new Intl.DateTimeFormat("es-HN", {
+          timeZone: "America/Tegucigalpa",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }).format(current);
+        const exactAnswer = asksDate && asksTime
+          ? `En Honduras, hoy es ${dateText} y la hora exacta es ${timeText}.`
+          : asksDate
+            ? `En Honduras, hoy es ${dateText}.`
+            : `En Honduras, la hora exacta es ${timeText}.`;
+        await storage.createMessage(conversationId, "assistant", exactAnswer);
+        res.write(`data: ${JSON.stringify({ content: exactAnswer })}\n\n`);
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        res.end();
+        return;
+      }
+
       const userNameLine = userName ? ` The user's name is "${userName}" — address them by name naturally and warmly.` : "";
       const now = new Date();
       const hondurasDate = new Intl.DateTimeFormat("es-HN", {
