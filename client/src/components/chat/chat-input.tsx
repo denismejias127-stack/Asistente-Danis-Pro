@@ -80,6 +80,9 @@ export function ChatInput({
   const { toast } = useToast();
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const voiceBaseRef = useRef("");
+  const voiceFinalRef = useRef("");
+  const voiceStoppedRef = useRef(false);
   const [images, setImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string }[]>([]);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -129,6 +132,7 @@ export function ChatInput({
 
   const handleVoiceToggle = () => {
     if (isListening) {
+      voiceStoppedRef.current = true;
       recognitionRef.current?.stop();
       setIsListening(false);
       return;
@@ -143,31 +147,35 @@ export function ChatInput({
     const recognition = new SpeechRec();
     recognitionRef.current = recognition;
     recognition.lang = navigator.language || "es-ES";
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    recognition.continuous = true;
+    voiceStoppedRef.current = false;
+    voiceBaseRef.current = input.trim();
+    voiceFinalRef.current = "";
 
     recognition.onstart = () => setIsListening(true);
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.trim();
-      if (transcript) {
-        // Auto-send the voice message directly
-        const finalMsg = attachedFiles.length > 0
-          ? transcript + attachedFiles.map(f => `\n\n📄 **${f.name}:**\n\`\`\`\n${f.content}\n\`\`\``).join("")
-          : transcript;
-        onSend(finalMsg, images, true);
-        setInput("");
-        setImages([]);
-        setAttachedFiles([]);
-        if (textareaRef.current) textareaRef.current.style.height = "inherit";
+      let interim = "";
+      let finalText = voiceFinalRef.current;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript.trim();
+        if (event.results[i].isFinal) finalText += `${text} `;
+        else interim += `${text} `;
       }
+      voiceFinalRef.current = finalText;
+      const combined = [voiceBaseRef.current, finalText.trim(), interim.trim()]
+        .filter(Boolean).join(" ");
+      setInput(combined);
     };
 
     recognition.onerror = (event: any) => {
-      setIsListening(false);
+      // Some browsers emit no-speech after a pause. Keep the transcript and
+      // let the user continue, rather than deleting it.
+      if (event.error !== "no-speech") setIsListening(false);
       if (event.error === "no-speech") {
-        toast({ title: "Sin voz", description: "No se detectó audio. Intenta de nuevo.", variant: "destructive" });
+        return;
       } else if (event.error === "not-allowed") {
         toast({ title: "Sin permiso", description: "Permite el acceso al micrófono en tu navegador.", variant: "destructive" });
       } else {
@@ -175,7 +183,17 @@ export function ChatInput({
       }
     };
 
-    recognition.onend = () => setIsListening(false);
+    recognition.onend = () => {
+      // Chrome can stop recognition after silence even in continuous mode.
+      // Restart it while the user still wants to dictate.
+      if (!voiceStoppedRef.current) {
+        window.setTimeout(() => {
+          try { recognition.start(); } catch { /* already starting */ }
+        }, 100);
+      } else {
+        setIsListening(false);
+      }
+    };
 
     recognition.start();
   };
@@ -189,7 +207,12 @@ export function ChatInput({
 
   const handleSend = () => {
     const hasContent = input.trim() || images.length > 0 || attachedFiles.length > 0;
-    if (hasContent && !isGenerating && !isListening) {
+    if (hasContent && !isGenerating) {
+      if (isListening) {
+        voiceStoppedRef.current = true;
+        recognitionRef.current?.stop();
+        setIsListening(false);
+      }
       let finalMessage = input;
       if (attachedFiles.length > 0) {
         const filesText = attachedFiles.map(f => `\n\n📄 **${f.name}:**\n\`\`\`\n${f.content}\n\`\`\``).join("");
