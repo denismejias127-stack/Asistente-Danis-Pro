@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Play, User2, Clapperboard } from "lucide-react";
+import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Play, User2, Clapperboard, CalendarDays } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
 import { useAuth } from "@/hooks/use-auth";
@@ -84,6 +84,16 @@ export function AppSidebar() {
         >
           <Clapperboard className="w-3.5 h-3.5" />
           Generar video
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setLocation("/calendar")}
+          data-testid="button-calendar"
+        >
+          <CalendarDays className="w-3.5 h-3.5" />
+          Calendario y hora
         </Button>
       </SidebarHeader>
 

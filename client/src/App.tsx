@@ -11,6 +11,7 @@ import ChatPage from "@/pages/chat-page";
 import LivePage from "@/pages/live-page";
 import VideoPage from "@/pages/video-page";
 import LoginPage from "@/pages/login";
+import CalendarPage from "@/pages/calendar-page";
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -36,6 +37,7 @@ function AppContent() {
           <Route path="/c/:id" component={ChatPage} />
           <Route path="/live" component={LivePage} />
           <Route path="/video" component={VideoPage} />
+          <Route path="/calendar" component={CalendarPage} />
           <Route component={NotFound} />
         </Switch>
       </div>
