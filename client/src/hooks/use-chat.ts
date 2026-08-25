@@ -52,7 +52,14 @@ export function useChatStream(conversationId?: number) {
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, model, images, userName: getUserName() }),
+        body: JSON.stringify({
+          content,
+          model,
+          images,
+          userName: getUserName(),
+          // Let the server answer clock questions in the user's actual timezone.
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
 
       if (!response.ok) {

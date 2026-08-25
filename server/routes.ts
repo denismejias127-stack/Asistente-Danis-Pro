@@ -252,7 +252,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!userId) return;
     try {
       const conversationId = parseInt(req.params.id);
-      const { content, model: modelKey, images, userName } = req.body as { content: string; model?: string; images?: string[]; userName?: string };
+      const { content, model: modelKey, images, userName, timezone } = req.body as {
+        content: string; model?: string; images?: string[]; userName?: string; timezone?: string;
+      };
       const imgs: string[] = Array.isArray(images) ? images.filter((s) => typeof s === "string" && s.startsWith("data:image")) : [];
       if (!content && imgs.length === 0) return res.status(400).json({ error: "El contenido es requerido" });
 
@@ -305,26 +307,54 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const asksDate = /\b(qué|que|cual|cuál)\s+(día|fecha)|\bfecha\s+(de\s+)?hoy\b|\bqué día es hoy\b|\bdía de hoy\b/i.test(content);
       const asksTime = /\bhora(s)?\b/i.test(content);
       if (asksDate || asksTime) {
+        const timezoneByPlace: Record<string, string> = {
+          honduras: "America/Tegucigalpa", "guatemala": "America/Guatemala",
+          "el salvador": "America/El_Salvador", nicaragua: "America/Managua",
+          "costa rica": "America/Costa_Rica", panamá: "America/Panama", panama: "America/Panama",
+          méxico: "America/Mexico_City", mexico: "America/Mexico_City",
+          colombia: "America/Bogota", perú: "America/Lima", peru: "America/Lima",
+          ecuador: "America/Guayaquil", venezuela: "America/Caracas",
+          argentina: "America/Argentina/Buenos_Aires", chile: "America/Santiago",
+          brasil: "America/Sao_Paulo", brazil: "America/Sao_Paulo",
+          españa: "Europe/Madrid", espana: "Europe/Madrid", spain: "Europe/Madrid",
+          "reino unido": "Europe/London", inglaterra: "Europe/London",
+          "estados unidos": "America/New_York", "eeuu": "America/New_York",
+          "nueva york": "America/New_York", california: "America/Los_Angeles",
+          "los angeles": "America/Los_Angeles", chicago: "America/Chicago",
+          "miami": "America/New_York", canadá: "America/Toronto", canada: "America/Toronto",
+          japón: "Asia/Tokyo", japon: "Asia/Tokyo", china: "Asia/Shanghai",
+          india: "Asia/Calcutta", australia: "Australia/Sydney",
+        };
+        const place = Object.keys(timezoneByPlace).find((name) => new RegExp(`\\b${name}\\b`, "i").test(content));
+        const requestedTimezone = place ? timezoneByPlace[place] : timezone;
+        let safeTimezone = "America/Tegucigalpa";
+        if (requestedTimezone) {
+          try {
+            new Intl.DateTimeFormat("es", { timeZone: requestedTimezone }).format();
+            safeTimezone = requestedTimezone;
+          } catch { /* use Honduras when a browser sends an invalid timezone */ }
+        }
         const current = new Date();
         const dateText = new Intl.DateTimeFormat("es-HN", {
-          timeZone: "America/Tegucigalpa",
+          timeZone: safeTimezone,
           weekday: "long",
           day: "numeric",
           month: "long",
           year: "numeric",
         }).format(current);
         const timeText = new Intl.DateTimeFormat("es-HN", {
-          timeZone: "America/Tegucigalpa",
-          hour: "2-digit",
+          timeZone: safeTimezone,
+          hour: "numeric",
           minute: "2-digit",
           second: "2-digit",
-          hour12: false,
-        }).format(current);
+          hour12: true,
+        }).format(current).replace(/\s*\.$/, "");
+        const locationText = place ? ` en ${place}` : "";
         const exactAnswer = asksDate && asksTime
-          ? `En Honduras, hoy es ${dateText} y la hora exacta es ${timeText}.`
+          ? `La fecha${locationText} es ${dateText} y la hora exacta es ${timeText}.`
           : asksDate
-            ? `En Honduras, hoy es ${dateText}.`
-            : `En Honduras, la hora exacta es ${timeText}.`;
+            ? `La fecha${locationText} es ${dateText}.`
+            : `La hora exacta${locationText} es ${timeText}.`;
         await storage.createMessage(conversationId, "assistant", exactAnswer);
         res.write(`data: ${JSON.stringify({ content: exactAnswer })}\n\n`);
         res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -334,8 +364,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const userNameLine = userName ? ` The user's name is "${userName}" — address them by name naturally and warmly.` : "";
       const now = new Date();
+      const chatTimezone = (() => {
+        try {
+          if (timezone) new Intl.DateTimeFormat("es", { timeZone: timezone }).format();
+          return timezone || "America/Tegucigalpa";
+        } catch { return "America/Tegucigalpa"; }
+      })();
       const hondurasDate = new Intl.DateTimeFormat("es-HN", {
-        timeZone: "America/Tegucigalpa",
+        timeZone: chatTimezone,
         weekday: "long",
         year: "numeric",
         month: "long",
@@ -343,9 +379,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        hour12: false,
+        hour12: true,
       }).format(now);
-      const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis.${userNameLine} Always respond in the same language the user writes in. IMPORTANT DATE AND TIME RULE: The current date and time in Honduras (America/Tegucigalpa) is "${hondurasDate}". Use this exact date and time when answering questions about today, tomorrow, yesterday, the day of the week, the month, the year, or the current time. Never guess a date from your training data. When the user asks you to write or generate code in any programming language (Python, JavaScript, HTML, CSS, Java, C++, SQL, etc.), always return complete, working code inside a proper markdown code block with the correct language tag (e.g. \`\`\`python, \`\`\`javascript, \`\`\`html). When the user pastes code and asks you to improve or modify it, return the complete improved code. Always return full working code, never partial snippets. Use markdown formatting when helpful (lists, bold, headers). Be conversational and friendly.`;
+      const SYSTEM_PROMPT = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Your name is ChatDanis. If anyone asks what your name is, always say your name is ChatDanis. If anyone asks who created you, always answer that you were created by Danis.${userNameLine} Always respond in the same language the user writes in. IMPORTANT DATE AND TIME RULE: The current date and time for the user's device timezone (${chatTimezone}) is "${hondurasDate}". Use this exact date and time when answering questions about today, tomorrow, yesterday, the day of the week, the month, the year, or the current time. Use normal 12-hour clock notation with a. m. or p. m., never military time. If the user asks about another country or city, use that place's timezone rather than guessing. Never guess a date from your training data. When the user asks you to write or generate code in any programming language (Python, JavaScript, HTML, CSS, Java, C++, SQL, etc.), always return complete, working code inside a proper markdown code block with the correct language tag (e.g. \`\`\`python, \`\`\`javascript, \`\`\`html). When the user pastes code and asks you to improve or modify it, return the complete improved code. Always return full working code, never partial snippets. Use markdown formatting when helpful (lists, bold, headers). Be conversational and friendly.`;
 
       const imgRegex = /!\[\]\((data:image[^)]+|https?:[^)]+)\)/g;
       const geminiMsgs: ChatMsg[] = chatMessages.map((m) => ({
