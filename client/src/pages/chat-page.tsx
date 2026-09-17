@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useRoute } from "wouter";
 import { useConversation } from "@/hooks/use-conversations";
 import { useChatStream, UIMessage, ChatModel } from "@/hooks/use-chat";
-import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
@@ -17,7 +16,6 @@ export default function ChatPage() {
 
   const { data: conversationData, isLoading } = useConversation(conversationId);
   const { sendMessage, isGenerating, streamingContent, optimisticUserMsg } = useChatStream(conversationId);
-  const { user } = useAuth();
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const [chatModel, setChatModel] = useState<ChatModel>("normal");

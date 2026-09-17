@@ -2,18 +2,16 @@ import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
+import { useUserName } from "@/hooks/use-voice-settings";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const { login, isLoggingIn, loginError } = useAuth();
+  const [nameInput, setNameInput] = useState("");
+  const { setName } = useUserName();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    try {
-      await login(email.trim());
-    } catch {}
+    if (!nameInput.trim()) return;
+    setName(nameInput.trim());
   };
 
   return (
@@ -28,7 +26,7 @@ export default function LoginPage() {
           <div className="text-center">
             <h1 className="text-3xl font-bold tracking-tight">Bienvenido a ChatDanis</h1>
             <p className="text-muted-foreground mt-2 text-base">
-              Escribe tu correo y entra de inmediato
+              Escribe tu nombre para comenzar
             </p>
           </div>
         </div>
@@ -37,34 +35,23 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3" noValidate>
           <Input
             type="text"
-            placeholder="tucorreo@ejemplo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            placeholder="¿Cómo te llamas?"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
             className="h-12 text-base rounded-xl px-4"
             autoComplete="email"
             inputMode="email"
             data-testid="input-email"
           />
 
-          {loginError && (
-            <p className="text-sm text-destructive text-center">{loginError}</p>
-          )}
-
           <Button
             type="submit"
             size="lg"
             className="w-full h-12 text-base rounded-xl shadow-md"
-            disabled={isLoggingIn || !email.includes("@")}
+            disabled={!nameInput.trim()}
             data-testid="button-enter"
           >
-            {isLoggingIn ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Entrando...
-              </span>
-            ) : (
-              "Entrar"
-            )}
+            Entrar
           </Button>
         </form>
 
@@ -84,7 +71,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-xs text-muted-foreground text-center">
-          Si ya usaste este correo antes, tu cuenta y conversaciones se recuperan automáticamente.
+          Tus conversaciones se guardan en este dispositivo y navegador.
         </p>
       </div>
     </div>

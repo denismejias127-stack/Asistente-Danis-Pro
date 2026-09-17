@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export type VoiceProfile = "mujer" | "hombre" | "joven";
 
@@ -39,9 +39,16 @@ export function useUserName() {
     return localStorage.getItem(NAME_KEY) || "";
   });
 
+  useEffect(() => {
+    const syncName = () => setNameState(localStorage.getItem(NAME_KEY) || "");
+    window.addEventListener("chatdanis-name-updated", syncName);
+    return () => window.removeEventListener("chatdanis-name-updated", syncName);
+  }, []);
+
   const setName = (n: string) => {
     localStorage.setItem(NAME_KEY, n);
     setNameState(n);
+    window.dispatchEvent(new Event("chatdanis-name-updated"));
   };
 
   return { name, setName };

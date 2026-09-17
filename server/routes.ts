@@ -179,6 +179,78 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // ── Guest chat (no account or database required) ───────────────────────────
+  app.post("/api/guest-chat", async (req, res) => {
+    try {
+      const {
+        content,
+        model: modelKey,
+        history,
+        userName,
+        timezone,
+      } = req.body as {
+        content?: string;
+        model?: string;
+        history?: ChatMsg[];
+        userName?: string;
+        timezone?: string;
+      };
+      if (!content?.trim()) return res.status(400).json({ error: "El contenido es requerido" });
+
+      const safeHistory: ChatMsg[] = Array.isArray(history)
+        ? history
+            .filter((message) => message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
+            .slice(-30)
+            .map((message) => ({ role: message.role, content: message.content.slice(0, 12000) }))
+        : [];
+      const userNameLine = userName ? ` The user's name is "${userName}".` : "";
+      const now = new Date();
+      const chatTimezone = (() => {
+        try {
+          if (timezone) new Intl.DateTimeFormat("es", { timeZone: timezone }).format();
+          return timezone || "America/Tegucigalpa";
+        } catch { return "America/Tegucigalpa"; }
+      })();
+      const currentDate = new Intl.DateTimeFormat("es-HN", {
+        timeZone: chatTimezone,
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }).format(now);
+      const guestSystem = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Always respond in the same language as the user.${userNameLine} The current date and time for the user's timezone (${chatTimezone}) is ${currentDate}. Use it for date and time questions and use normal 12-hour clock notation. Be conversational and helpful.`;
+
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      const imageRequest = /\b(genera|crea|haz|dibuja|pinta|diseña|generate|create|draw)\b.{0,30}\b(imagen|foto|image|photo|dibujo)\b/i.test(content);
+      if (imageRequest) {
+        const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(content)}?width=512&height=512&nologo=true&enhance=false&seed=${Math.floor(Math.random() * 1000000)}`;
+        res.write(`data: ${JSON.stringify({ replace: `![](${imageUrl})` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+        return res.end();
+      }
+
+      for await (const text of streamChat([...safeHistory, { role: "user", content }], guestSystem, MODEL_MAP[modelKey || "normal"] || GEMINI_MODEL)) {
+        res.write(`data: ${JSON.stringify({ content: text })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    } catch (error) {
+      console.error("Guest chat error:", error);
+      if (res.headersSent) {
+        res.write(`data: ${JSON.stringify({ error: "Error de conexión" })}\n\n`);
+        res.end();
+      } else {
+        res.status(500).json({ error: "Error al procesar el mensaje" });
+      }
+    }
+  });
+
   // ── Current User ────────────────────────────────────────────────────────────
   app.get("/api/auth/user", async (req, res) => {
     const userId = getEffectiveUserId(req);

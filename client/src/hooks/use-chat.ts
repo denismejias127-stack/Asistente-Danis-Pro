@@ -1,10 +1,10 @@
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
 import { useCreateConversation } from "./use-conversations";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { getUserName } from "./use-voice-settings";
+import { addLocalMessage, getLocalConversation } from "@/lib/local-chat";
 
 // Local representation of a message to blend DB state with streaming state
 export type UIMessage = {
@@ -47,9 +47,15 @@ export function useChatStream(conversationId?: number) {
         setLocation(`/c/${newConv.id}`);
       }
 
-      // 2. Start SSE Stream
-      const url = buildUrl(api.messages.create.path, { id: targetConvId });
-      const response = await fetch(url, {
+      const previousConversation = getLocalConversation(targetConvId);
+      const history = previousConversation?.messages.map((message) => ({
+        role: message.role,
+        content: message.content,
+      })) || [];
+      addLocalMessage(targetConvId, "user", optimisticContent);
+
+      // The guest endpoint is stateless; history and persistence stay local.
+      const response = await fetch("/api/guest-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -57,6 +63,7 @@ export function useChatStream(conversationId?: number) {
           model,
           images,
           userName: getUserName(),
+          history,
           // Let the server answer clock questions in the user's actual timezone.
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
@@ -71,6 +78,7 @@ export function useChatStream(conversationId?: number) {
 
       const decoder = new TextDecoder();
       let buffer = "";
+      let responseContent = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -90,10 +98,12 @@ export function useChatStream(conversationId?: number) {
             try {
               const data = JSON.parse(dataStr);
               if (data.content) {
+                responseContent += data.content;
                 setStreamingContent(prev => prev + data.content);
               }
               if (data.replace !== undefined) {
                 // Used for image gen: replace the entire streaming content at once
+                responseContent = data.replace;
                 setStreamingContent(data.replace);
               }
               if (data.error) {
@@ -110,6 +120,8 @@ export function useChatStream(conversationId?: number) {
         }
       }
 
+      if (responseContent) addLocalMessage(targetConvId, "assistant", responseContent);
+
     } catch (error) {
       console.error("Chat streaming error:", error);
       toast({
@@ -122,10 +134,10 @@ export function useChatStream(conversationId?: number) {
       setOptimisticUserMsg(null);
       setStreamingContent("");
       
-      // 3. Invalidate to get true final state from DB
+      // Refresh the local conversation list and message view.
       if (targetConvId) {
-        queryClient.invalidateQueries({ queryKey: [api.conversations.get.path, targetConvId] });
-        queryClient.invalidateQueries({ queryKey: [api.conversations.list.path] });
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations/:id", targetConvId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
       }
     }
   }, [conversationId, isGenerating, createConv, setLocation, queryClient, toast]);

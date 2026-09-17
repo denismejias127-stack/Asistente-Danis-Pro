@@ -1,7 +1,6 @@
-import { MessageSquare, Plus, Trash2, LogOut, Crown, Image, Video, Play, User2, Clapperboard, CalendarDays } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Image, Video, Play, User2, Clapperboard, CalendarDays } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
-import { useAuth } from "@/hooks/use-auth";
 import { useVoiceSettings, useUserName, VOICE_PROFILES, VoiceProfile } from "@/hooks/use-voice-settings";
 import { testVoiceProfile } from "@/lib/speak";
 import {
@@ -17,7 +16,6 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
@@ -26,7 +24,6 @@ import { useState } from "react";
 export function AppSidebar() {
   const { data: conversations, isLoading } = useConversations();
   const deleteMutation = useDeleteConversation();
-  const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { settings, updateSettings } = useVoiceSettings();
   const { name, setName } = useUserName();
@@ -235,19 +232,14 @@ export function AppSidebar() {
       <SidebarFooter className="p-3 border-t border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate text-sidebar-foreground">{name || user?.email || "Invitado"}</p>
-            {user?.isPro && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                <Crown className="w-2.5 h-2.5 mr-0.5" />Pro
-              </Badge>
-            )}
+            <p className="text-sm font-medium truncate text-sidebar-foreground">{name || "Invitado"}</p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             className="w-8 h-8 text-sidebar-foreground/60 hover:text-sidebar-foreground shrink-0"
-            onClick={() => logout()}
-            title="Cerrar sesión"
+            onClick={() => setName("")}
+            title="Cambiar nombre"
             data-testid="button-logout"
           >
             <LogOut className="w-4 h-4" />

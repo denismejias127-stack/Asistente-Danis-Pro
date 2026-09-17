@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { useAuth } from "@/hooks/use-auth";
+import { useUserName } from "@/hooks/use-voice-settings";
 import NotFound from "@/pages/not-found";
 import ChatPage from "@/pages/chat-page";
 import LivePage from "@/pages/live-page";
@@ -14,17 +14,9 @@ import LoginPage from "@/pages/login";
 import CalendarPage from "@/pages/calendar-page";
 
 function AppContent() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { name } = useUserName();
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <span className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
+  if (!name) {
     return <LoginPage />;
   }
 
