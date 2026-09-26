@@ -1,4 +1,4 @@
-import { MessageSquare, Plus, Trash2, Image, Video, Play, User2, Clapperboard, CalendarDays } from "lucide-react";
+import { MessageSquare, Plus, Trash2, Image, Video, Play, User2, Clapperboard, CalendarDays, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useConversations, useDeleteConversation } from "@/hooks/use-conversations";
 import { useVoiceSettings, useUserName, VOICE_PROFILES, VoiceProfile } from "@/hooks/use-voice-settings";
