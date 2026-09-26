@@ -49,7 +49,8 @@ async function buildAll() {
   if (scriptMatch?.[1]) {
     const scriptPath = `dist/public${scriptMatch[1]}`;
     const script = (await readFile(scriptPath, "utf-8")).replace(/<\/script/gi, "<\\/script");
-    clientHtml = clientHtml.replace(scriptMatch[0], () => `<script>${script}</script>`);
+    clientHtml = clientHtml.replace(scriptMatch[0], "");
+    clientHtml = clientHtml.replace("</body>", () => `<script>${script}</script>\n  </body>`);
   }
   if (styleMatch?.[1]) {
     const stylePath = `dist/public${styleMatch[1]}`;

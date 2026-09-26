@@ -1,0 +1,1 @@
+- [Self-contained HTML builds](self-contained-html-build.md) — inline scripts must be inserted after the root and via callback replacements.
