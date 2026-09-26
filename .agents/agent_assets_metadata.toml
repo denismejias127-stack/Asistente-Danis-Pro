@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "j-2zIjlwmyZOGO-smisj2"
+uri = "file://dist/public/index.html"
+type = "html"
+title = "ChatDanis — index.html"
+description = "Archivo HTML autocontenido de producción, con CSS y JavaScript incluidos. Las llamadas a las APIs siguen apuntando al backend."
+logical_id = "54642a67-3db6-49bc-83a2-fce1cb4b237f"
+content_hash = "sha256:7ac28c1d0c8e98bbed242488905cd4b28a8cd22e0b2352d9400c1f47907a6575"
+size = 1425186
+mtime_ms = 1790456134756
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c/54642a67-3db6-49bc-83a2-fce1cb4b237f/02121d53-178f-4154-8fd9-b016a789372b"
+storage_version_token = "1790456439494933"
+content_type = "text/html"
