@@ -28,3 +28,17 @@ mtime_ms = 1790457205519
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c/1a56cbb3-a675-4a6c-85d8-15a73e1efc25/af509f65-bcdc-436e-aa22-d666461b9023"
 storage_version_token = "1790457209775227"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "ONP5HFQ7WDhbD5msdBVzi"
+uri = "file://downloads/ChatDanis-completo.zip"
+type = "unspecified"
+title = "Descargar ChatDanis completo"
+description = "Paquete ejecutable con frontend, backend compilado, dependencias, configuración de entorno y guía en español."
+logical_id = "de7d0b64-8a3d-4568-b00d-1e73cfb4481b"
+content_hash = "sha256:0974af3845d12e493ac72ca666c046304074a11b4831951b854bd1d034c86613"
+size = 1371759
+mtime_ms = 1790457815707
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c/de7d0b64-8a3d-4568-b00d-1e73cfb4481b/85de568a-0b10-4b23-bd14-f7181ad1e19f"
+storage_version_token = "1790457820005649"
+content_type = "application/octet-stream"
