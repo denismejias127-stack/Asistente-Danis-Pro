@@ -42,19 +42,19 @@ async function buildAll() {
   // relative requests to the server, so secrets never reach the browser.
   const clientHtmlPath = "dist/public/index.html";
   let clientHtml = await readFile(clientHtmlPath, "utf-8");
-  const scriptMatch = clientHtml.match(/<script[^>]+src="([^"]+)"[^>]*><\/script>/);
-  const styleMatch = clientHtml.match(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"[^>]*>/);
+  const scriptMatch = clientHtml.match(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/i);
+  const styleMatch = clientHtml.match(
+    /<link\b(?=[^>]*\brel="stylesheet")(?=[^>]*\bhref="(\/[^"]+)")[^>]*>/i,
+  );
   if (scriptMatch?.[1]) {
     const scriptPath = `dist/public${scriptMatch[1]}`;
     const script = (await readFile(scriptPath, "utf-8")).replace(/<\/script/gi, "<\\/script");
-    clientHtml = clientHtml.replace(scriptMatch[0], `<script>${script}</script>`);
-    await rm(scriptPath, { force: true });
+    clientHtml = clientHtml.replace(scriptMatch[0], () => `<script>${script}</script>`);
   }
   if (styleMatch?.[1]) {
     const stylePath = `dist/public${styleMatch[1]}`;
     const style = await readFile(stylePath, "utf-8");
-    clientHtml = clientHtml.replace(styleMatch[0], `<style>${style}</style>`);
-    await rm(stylePath, { force: true });
+    clientHtml = clientHtml.replace(styleMatch[0], () => `<style>${style}</style>`);
   }
   await writeFile(clientHtmlPath, clientHtml);
   console.log("client bundled into dist/public/index.html");
