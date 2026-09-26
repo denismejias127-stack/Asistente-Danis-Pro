@@ -14,3 +14,17 @@ mtime_ms = 1790456134756
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c/54642a67-3db6-49bc-83a2-fce1cb4b237f/2f664241-cc46-46f2-9403-2a8e1ef15a5e"
 storage_version_token = "1790457079519683"
 content_type = "text/html"
+
+[[outputs]]
+id = "GdT6hoazW7yhyT1HqrOar"
+uri = "file://downloads/ChatDanis-index.zip"
+type = "unspecified"
+title = "Descargar ChatDanis — index.html (ZIP)"
+description = "Archivo ZIP descargable. Dentro encontrarás el index.html autocontenido de producción."
+logical_id = "1a56cbb3-a675-4a6c-85d8-15a73e1efc25"
+content_hash = "sha256:3b7b14be92de86b09fdb86ecb301046d320c2c583076224f3e3e16068957bb00"
+size = 456912
+mtime_ms = 1790457205519
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:7a00d8a3-74a3-4c27-9ab5-0fd2de68fa4c/1a56cbb3-a675-4a6c-85d8-15a73e1efc25/af509f65-bcdc-436e-aa22-d666461b9023"
+storage_version_token = "1790457209775227"
+content_type = "application/octet-stream"
