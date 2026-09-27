@@ -11,8 +11,14 @@ async function callPollinations(messages: PMsg[]): Promise<string> {
     body: JSON.stringify({ messages, model: "openai", stream: false }),
   });
   if (!resp.ok) throw new Error(`Pollinations ${resp.status}`);
-  const data = await resp.json() as any;
-  return data?.choices?.[0]?.message?.content || data?.text || "";
+  const raw = await resp.text();
+  try {
+    const data = JSON.parse(raw) as any;
+    return data?.choices?.[0]?.message?.content || data?.text || raw;
+  } catch {
+    // Pollinations can return plain text even when stream=false.
+    return raw.trim();
+  }
 }
 
 const liveBodyParser = express.json({ limit: "50mb" });
@@ -37,18 +43,21 @@ export function registerLiveChatRoutes(app: Express) {
 
   app.post("/api/live-chat", liveBodyParser, async (req, res) => {
     try {
-      const { audio, image, history, voice = "alloy" } = req.body as {
-        audio: string;
+      const { audio, text, image, history, voice = "alloy" } = req.body as {
+        audio?: string;
+        text?: string;
         image?: string;
         history?: LiveTurn[];
         voice?: "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
       };
 
-      if (!audio) return res.status(400).json({ error: "Falta el audio" });
-
-      const rawBuffer = Buffer.from(audio, "base64");
-      const { buffer: audioBuffer, format } = await ensureCompatibleFormat(rawBuffer);
-      const userText = (await speechToText(audioBuffer, format)).trim();
+      let userText = text?.trim() || "";
+      if (!userText && audio) {
+        const rawBuffer = Buffer.from(audio, "base64");
+        const { buffer: audioBuffer, format } = await ensureCompatibleFormat(rawBuffer);
+        userText = (await speechToText(audioBuffer, format)).trim();
+      }
+      if (!userText) return res.status(400).json({ error: "Falta el texto" });
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");

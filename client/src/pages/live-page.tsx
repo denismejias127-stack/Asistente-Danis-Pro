@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize, ScreenShare, ScreenShareOff } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize, ScreenShare, ScreenShareOff, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +14,11 @@ export default function LivePage() {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const recognitionRef = useRef<any>(null);
+  const startListeningRef = useRef<(() => void) | null>(null);
+  const recognitionWantedRef = useRef(false);
+  const finalTranscriptRef = useRef("");
+  const finalResultMapRef = useRef<Map<number, string>>(new Map());
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioWorkletRef = useRef<AudioWorkletNode | null>(null);
   const historyRef = useRef<Turn[]>([]);
@@ -25,6 +30,7 @@ export default function LivePage() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [userText, setUserText] = useState("");
+  const [draftText, setDraftText] = useState("");
   const [aiText, setAiText] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -47,7 +53,7 @@ export default function LivePage() {
     } catch {}
   }, []);
 
-  // Start camera/mic stream — must be called synchronously from a user gesture
+  // Start camera stream — speech recognition handles the microphone separately.
   const startStream = useCallback(async (withVideo: boolean, face: "user" | "environment") => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       toast({
@@ -231,24 +237,112 @@ export default function LivePage() {
     setAiText("");
   }, [startStream, cameraOn, facingMode]);
 
-  // Ask for microphone permission and begin live listening when the page opens.
-  // Browsers may still require a tap; in that case the main microphone button
-  // remains available as the fallback.
-  const autoStartedMicRef = useRef(false);
-  useEffect(() => {
-    if (autoStartedMicRef.current) return;
-    autoStartedMicRef.current = true;
-    let cancelled = false;
-    void (async () => {
-      const stream = await startStream(false, "user");
-      if (!cancelled && stream && !recorderRef.current) {
-        await startRecording(stream);
-      }
-    })();
-    return () => {
-      cancelled = true;
+  const startListening = useCallback(() => {
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRec) {
+      toast({
+        title: "No disponible",
+        description: "Tu navegador no permite dictado en vivo. Prueba Chrome.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    recognitionWantedRef.current = true;
+    const recognition = new SpeechRec();
+    recognitionRef.current = recognition;
+    recognition.lang = navigator.language || "es-ES";
+    recognition.interimResults = true;
+    recognition.continuous = true;
+    recognition.maxAlternatives = 1;
+    finalResultMapRef.current.clear();
+
+    recognition.onstart = () => {
+      setMicOn(true);
+      setStatus("listening");
     };
-    // This runs once for the live page, not every time the camera changes.
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      let finalText = finalTranscriptRef.current;
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript.trim();
+        if (!text) continue;
+        if (event.results[i].isFinal) {
+          if (finalResultMapRef.current.get(i) !== text) {
+            finalResultMapRef.current.set(i, text);
+            finalText = `${finalText} ${text}`.trim();
+          }
+        } else {
+          interim = `${interim} ${text}`.trim();
+        }
+      }
+      finalTranscriptRef.current = finalText;
+      setDraftText([finalText, interim].filter(Boolean).join(" ").trim());
+    };
+
+    recognition.onerror = (event: any) => {
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        recognitionWantedRef.current = false;
+        setMicOn(false);
+        toast({
+          title: "Permiso de micrófono",
+          description: "Permite el micrófono para que ChatDanis pueda escribir lo que dices.",
+          variant: "destructive",
+        });
+      } else if (event.error !== "no-speech") {
+        toast({
+          title: "No se pudo escuchar",
+          description: "Toca el micrófono para intentarlo de nuevo.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    recognition.onend = () => {
+      if (!recognitionWantedRef.current) {
+        setMicOn(false);
+        setStatus("idle");
+        return;
+      }
+      // Mobile Chrome ends a recognition session after a pause. Start a new
+      // session while preserving the text already shown to the user.
+      window.setTimeout(() => {
+        if (recognitionWantedRef.current) startListeningRef.current?.();
+      }, 120);
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      setMicOn(false);
+      recognitionWantedRef.current = false;
+      toast({
+        title: "No se pudo iniciar",
+        description: "Toca el micrófono otra vez para iniciar el dictado.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
+  startListeningRef.current = startListening;
+
+  const stopListening = useCallback(() => {
+    recognitionWantedRef.current = false;
+    recognitionRef.current?.stop();
+    setMicOn(false);
+    setStatus("idle");
+  }, []);
+
+  // Open the live page already ready to write the user's voice as text.
+  useEffect(() => {
+    const timer = window.setTimeout(() => startListening(), 250);
+    return () => {
+      window.clearTimeout(timer);
+      recognitionWantedRef.current = false;
+      recognitionRef.current?.stop();
+    };
+    // This is intentionally only the initial live-page activation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -352,9 +446,81 @@ export default function LivePage() {
     }
   }, [captureFrame, ensurePlayback, toast]);
 
+  const sendText = useCallback(async () => {
+    const content = draftText.trim();
+    if (!content || status === "thinking") return;
+
+    stopListening();
+    setDraftText("");
+    finalTranscriptRef.current = "";
+    setUserText(content);
+    setAiText("");
+    setStatus("thinking");
+
+    try {
+      const res = await fetch("/api/live-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: content,
+          image: captureFrame(),
+          history: historyRef.current,
+        }),
+      });
+      if (!res.ok || !res.body) throw new Error("send_failed");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantFull = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const event = JSON.parse(line.slice(6));
+          if (event.type === "transcript") {
+            assistantFull = event.data;
+            setAiText(event.data);
+            setStatus("speaking");
+          } else if (event.type === "error") {
+            throw new Error(event.error || "live_chat_failed");
+          }
+        }
+      }
+
+      if (assistantFull && "speechSynthesis" in window) {
+        const utterance = new SpeechSynthesisUtterance(assistantFull);
+        utterance.lang = navigator.language || "es-ES";
+        utterance.rate = 1;
+        utterance.onend = () => setStatus("idle");
+        utterance.onerror = () => setStatus("idle");
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setStatus("idle");
+      }
+
+      historyRef.current.push({ role: "user", content });
+      if (assistantFull) historyRef.current.push({ role: "assistant", content: assistantFull });
+      historyRef.current = historyRef.current.slice(-12);
+    } catch {
+      setStatus("idle");
+      toast({
+        title: "No se pudo enviar el mensaje",
+        description: "Revisa la conexión e inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  }, [captureFrame, draftText, status, stopListening, toast]);
+
   const toggleMic = () => {
-    if (micOn) stopRecording();
-    else startRecording();
+    if (micOn) stopListening();
+    else startListening();
   };
 
   const flipCamera = () => {
@@ -363,7 +529,7 @@ export default function LivePage() {
 
   const statusLabel = {
     idle: "Toca el micro para hablar",
-    listening: "Escuchando...",
+    listening: "Escribiendo lo que dices...",
     thinking: "Pensando...",
     speaking: "Hablando...",
   }[status];
@@ -457,6 +623,15 @@ export default function LivePage() {
       {/* Captions overlay */}
       <div className="absolute bottom-32 left-0 right-0 z-10 px-4 pointer-events-none">
         <div className="max-w-2xl mx-auto space-y-2">
+          {draftText && (
+            <div
+              className="ml-auto w-fit max-w-[92%] rounded-2xl border border-red-400/30 bg-black/60 px-4 py-2 text-sm text-white shadow-lg backdrop-blur-md"
+              data-testid="text-live-draft"
+            >
+              <span>{draftText}</span>
+              {micOn && <span className="ml-1 inline-block h-4 w-1 animate-pulse rounded-full bg-red-400 align-middle" />}
+            </div>
+          )}
           {userText && (
             <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl text-sm text-white/90 self-end ml-auto w-fit max-w-[85%]" data-testid="text-user-transcript">
               {userText}
@@ -498,6 +673,21 @@ export default function LivePage() {
             data-testid="button-toggle-mic"
           >
             {micOn ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+          </Button>
+
+          <Button
+            size="icon"
+            className={`w-14 h-14 rounded-full border border-white/20 transition-all ${
+              draftText.trim() && status !== "thinking"
+                ? "bg-zinc-900 text-white shadow-lg hover:bg-zinc-800"
+                : "bg-zinc-900/40 text-white/30"
+            }`}
+            onClick={sendText}
+            disabled={!draftText.trim() || status === "thinking"}
+            data-testid="button-live-send"
+            title="Enviar texto a ChatDanis"
+          >
+            <ArrowUp className="h-6 w-6 stroke-[3]" />
           </Button>
 
           <Button
