@@ -1,3 +1,4 @@
 - [Self-contained HTML builds](self-contained-html-build.md) — inline scripts must be inserted after the root and via callback replacements.
 - [Production workflow builds](production-workflow-build.md) — the preview workflow serves dist, so source edits require a production build before restart.
 - [Live chat provider responses](live-chat-provider-responses.md) — the live AI provider may return plain text even when JSON streaming is requested.
+- [Live speech sessions](live-speech-sessions.md) — browser speech recognition needs a separate active-session guard from the user's desired listening state.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize, ScreenShare, ScreenShareOff, ArrowUp } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize, ScreenShare, ScreenShareOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,8 @@ export default function LivePage() {
   const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<any>(null);
   const startListeningRef = useRef<(() => void) | null>(null);
+  const recognitionActiveRef = useRef(false);
+  const sendTextRef = useRef<(() => void) | null>(null);
   const recognitionWantedRef = useRef(false);
   const finalTranscriptRef = useRef("");
   const finalResultMapRef = useRef<Map<number, string>>(new Map());
@@ -238,8 +240,11 @@ export default function LivePage() {
   }, [startStream, cameraOn, facingMode]);
 
   const startListening = useCallback(() => {
+    if (recognitionActiveRef.current) return;
+
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRec) {
+      recognitionWantedRef.current = false;
       toast({
         title: "No disponible",
         description: "Tu navegador no permite dictado en vivo. Prueba Chrome.",
@@ -251,6 +256,7 @@ export default function LivePage() {
     recognitionWantedRef.current = true;
     const recognition = new SpeechRec();
     recognitionRef.current = recognition;
+    recognitionActiveRef.current = true;
     recognition.lang = navigator.language || "es-ES";
     recognition.interimResults = true;
     recognition.continuous = true;
@@ -300,6 +306,7 @@ export default function LivePage() {
     };
 
     recognition.onend = () => {
+      recognitionActiveRef.current = false;
       if (!recognitionWantedRef.current) {
         setMicOn(false);
         setStatus("idle");
@@ -327,11 +334,15 @@ export default function LivePage() {
 
   startListeningRef.current = startListening;
 
-  const stopListening = useCallback(() => {
+  const stopListening = useCallback((sendAfterStopping = false) => {
     recognitionWantedRef.current = false;
     recognitionRef.current?.stop();
     setMicOn(false);
     setStatus("idle");
+    if (sendAfterStopping) {
+      // Give the recognition engine a moment to deliver its last final word.
+      window.setTimeout(() => sendTextRef.current?.(), 180);
+    }
   }, []);
 
   // Open the live page already ready to write the user's voice as text.
@@ -450,7 +461,7 @@ export default function LivePage() {
     const content = draftText.trim();
     if (!content || status === "thinking") return;
 
-    stopListening();
+    stopListening(false);
     setDraftText("");
     finalTranscriptRef.current = "";
     setUserText(content);
@@ -518,8 +529,10 @@ export default function LivePage() {
     }
   }, [captureFrame, draftText, status, stopListening, toast]);
 
+  sendTextRef.current = sendText;
+
   const toggleMic = () => {
-    if (micOn) stopListening();
+    if (micOn) stopListening(true);
     else startListening();
   };
 
@@ -673,21 +686,6 @@ export default function LivePage() {
             data-testid="button-toggle-mic"
           >
             {micOn ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-          </Button>
-
-          <Button
-            size="icon"
-            className={`w-14 h-14 rounded-full border border-white/20 transition-all ${
-              draftText.trim() && status !== "thinking"
-                ? "bg-zinc-900 text-white shadow-lg hover:bg-zinc-800"
-                : "bg-zinc-900/40 text-white/30"
-            }`}
-            onClick={sendText}
-            disabled={!draftText.trim() || status === "thinking"}
-            data-testid="button-live-send"
-            title="Enviar texto a ChatDanis"
-          >
-            <ArrowUp className="h-6 w-6 stroke-[3]" />
           </Button>
 
           <Button
