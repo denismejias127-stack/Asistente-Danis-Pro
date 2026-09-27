@@ -60,8 +60,8 @@ const MODEL_OPTIONS: {
 }[] = [
   { key: "fast",   label: "Rápido",  icon: Zap,          description: "Respuestas instantáneas",  color: "text-yellow-500", bg: "hover:bg-yellow-50 dark:hover:bg-yellow-900/20" },
   { key: "normal", label: "Normal",  icon: MessageSquare, description: "Equilibrado",              color: "text-primary",    bg: "hover:bg-primary/5" },
-  { key: "think",  label: "Pensar",  icon: Brain,         description: "Razonamiento profundo",    color: "text-blue-500",   bg: "hover:bg-blue-50 dark:hover:bg-blue-900/20" },
-  { key: "pro",    label: "Pro",     icon: Star,          description: "Máxima calidad",           color: "text-purple-500", bg: "hover:bg-purple-50 dark:hover:bg-purple-900/20" },
+  { key: "think",  label: "Pensamiento", icon: Brain,     description: "Analiza con cuidado",      color: "text-blue-500",   bg: "hover:bg-blue-50 dark:hover:bg-blue-900/20" },
+  { key: "pro",    label: "Pro",         icon: Star,      description: "Máxima calidad y detalle", color: "text-purple-500", bg: "hover:bg-purple-50 dark:hover:bg-purple-900/20" },
 ];
 
 export function ChatInput({
@@ -83,6 +83,7 @@ export function ChatInput({
   const voiceBaseRef = useRef("");
   const voiceFinalRef = useRef("");
   const voiceStoppedRef = useRef(false);
+  const finalResultSignaturesRef = useRef<Map<number, string>>(new Map());
   const [images, setImages] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<{ name: string; content: string }[]>([]);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -149,10 +150,13 @@ export function ChatInput({
     recognition.lang = navigator.language || "es-ES";
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    recognition.continuous = true;
+    // A single recognition session is more reliable than auto-restarting
+    // Chrome's continuous mode, which can replay the last result several times.
+    recognition.continuous = false;
     voiceStoppedRef.current = false;
     voiceBaseRef.current = input.trim();
     voiceFinalRef.current = "";
+    finalResultSignaturesRef.current.clear();
 
     recognition.onstart = () => setIsListening(true);
 
@@ -161,7 +165,12 @@ export function ChatInput({
       let finalText = voiceFinalRef.current;
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0].transcript.trim();
-        if (event.results[i].isFinal) finalText += `${text} `;
+        if (event.results[i].isFinal) {
+          const previousText = finalResultSignaturesRef.current.get(i);
+          if (previousText === text) continue;
+          finalResultSignaturesRef.current.set(i, text);
+          finalText += `${text} `;
+        }
         else interim += `${text} `;
       }
       voiceFinalRef.current = finalText;
@@ -184,15 +193,7 @@ export function ChatInput({
     };
 
     recognition.onend = () => {
-      // Chrome can stop recognition after silence even in continuous mode.
-      // Restart it while the user still wants to dictate.
-      if (!voiceStoppedRef.current) {
-        window.setTimeout(() => {
-          try { recognition.start(); } catch { /* already starting */ }
-        }, 100);
-      } else {
-        setIsListening(false);
-      }
+      setIsListening(false);
     };
 
     recognition.start();
@@ -302,7 +303,7 @@ export function ChatInput({
       >
         <Textarea
           ref={textareaRef}
-          value={isListening ? "" : input}
+          value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}

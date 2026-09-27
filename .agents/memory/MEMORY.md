@@ -1,1 +1,2 @@
 - [Self-contained HTML builds](self-contained-html-build.md) — inline scripts must be inserted after the root and via callback replacements.
+- [Production workflow builds](production-workflow-build.md) — the preview workflow serves dist, so source edits require a production build before restart.

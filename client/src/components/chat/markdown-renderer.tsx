@@ -16,11 +16,11 @@ function HtmlPreviewModal({ html, onClose }: { html: string; onClose: () => void
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white rounded-2xl w-[min(96vw,1100px)] h-[min(84vh,760px)] flex flex-col overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 rounded-t-2xl">
-          <span className="text-sm font-medium text-gray-700">Vista previa HTML</span>
+            <span className="text-sm font-medium text-gray-700">Vista previa HTML</span>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-700 transition-colors"
@@ -32,7 +32,8 @@ function HtmlPreviewModal({ html, onClose }: { html: string; onClose: () => void
         <iframe
           srcDoc={html}
           className="flex-1 w-full border-0"
-          sandbox="allow-scripts"
+          sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock"
+          allow="autoplay; fullscreen; gamepad"
           title="Vista previa HTML"
         />
       </div>

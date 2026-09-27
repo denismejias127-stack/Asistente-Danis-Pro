@@ -22,8 +22,6 @@ type LiveTurn = { role: "user" | "assistant"; content: string };
 export function registerLiveChatRoutes(app: Express) {
   // Speech-to-text only (dictation for text chat)
   app.post("/api/transcribe", liveBodyParser, async (req, res) => {
-    const userId = (req as any).session?.userId;
-    if (!userId) return res.status(401).json({ error: "No autenticado" });
     try {
       const { audio } = req.body as { audio: string };
       if (!audio) return res.status(400).json({ error: "Falta el audio" });
@@ -38,9 +36,6 @@ export function registerLiveChatRoutes(app: Express) {
   });
 
   app.post("/api/live-chat", liveBodyParser, async (req, res) => {
-    const userId = (req as any).session?.userId;
-    if (!userId) return res.status(401).json({ error: "No autenticado" });
-
     try {
       const { audio, image, history, voice = "alloy" } = req.body as {
         audio: string;

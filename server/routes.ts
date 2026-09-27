@@ -52,6 +52,13 @@ const MODEL_MAP: Record<string, string> = {
   pro:    GEMINI_MODEL,
 };
 
+const MODEL_GUIDANCE: Record<string, string> = {
+  fast: "Modo rápido: responde con claridad y en pocas palabras, priorizando la solución inmediata.",
+  normal: "Modo normal: responde de forma equilibrada, clara y útil.",
+  think: "Modo pensamiento: analiza el problema con cuidado antes de responder, muestra conclusiones y pasos verificables sin revelar razonamiento interno privado.",
+  pro: "Modo Pro: entrega la respuesta más completa y pulida posible, con estructura, ejemplos y advertencias cuando sean útiles.",
+};
+
 async function* streamChat(
   messages: ChatMsg[],
   systemPrompt: string,
@@ -221,7 +228,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         minute: "2-digit",
         hour12: true,
       }).format(now);
-      const guestSystem = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Always respond in the same language as the user.${userNameLine} The current date and time for the user's timezone (${chatTimezone}) is ${currentDate}. Use it for date and time questions and use normal 12-hour clock notation. Be conversational and helpful.`;
+       const modeGuidance = MODEL_GUIDANCE[modelKey || "normal"] || MODEL_GUIDANCE.normal;
+       const guestSystem = `You are ChatDanis, a helpful and friendly AI assistant created by Danis. Always respond in the same language as the user.${userNameLine} The current date and time for the user's timezone (${chatTimezone}) is ${currentDate}. Use it for date and time questions and use normal 12-hour clock notation. Be conversational and helpful. ${modeGuidance} When generating a standalone HTML or canvas game for the preview, always include a visible full-screen layout, a viewport meta tag, large touch-friendly controls, responsive sizing, a non-black background, and JavaScript that starts without external dependencies. Return complete working HTML.`;
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");

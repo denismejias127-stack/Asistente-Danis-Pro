@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, X, SwitchCamera, Maximize, Minimize, ScreenShare, ScreenShareOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useToast } from "@/hooks/use-toast";
@@ -9,7 +9,9 @@ type Turn = { role: "user" | "assistant"; content: string };
 
 export default function LivePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -19,6 +21,7 @@ export default function LivePage() {
   const [cameraOn, setCameraOn] = useState(false);
   const [streamReady, setStreamReady] = useState(false);
   const [micOn, setMicOn] = useState(false);
+  const [screenSharing, setScreenSharing] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [status, setStatus] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [userText, setUserText] = useState("");
@@ -96,6 +99,50 @@ export default function LivePage() {
     }
   }, [toast]);
 
+  const stopScreenShare = useCallback(() => {
+    screenStreamRef.current?.getTracks().forEach((track) => track.stop());
+    screenStreamRef.current = null;
+    if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
+    setScreenSharing(false);
+  }, []);
+
+  const startScreenShare = useCallback(async () => {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+      toast({
+        title: "No disponible",
+        description: "Tu navegador no permite compartir la pantalla. Prueba Chrome o la app instalada.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      stopScreenShare();
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: { ideal: 15, max: 30 } },
+        audio: false,
+      });
+      screenStreamRef.current = screenStream;
+      setScreenSharing(true);
+      const track = screenStream.getVideoTracks()[0];
+      if (track) track.onended = stopScreenShare;
+      requestAnimationFrame(() => {
+        if (screenVideoRef.current) {
+          screenVideoRef.current.srcObject = screenStream;
+          screenVideoRef.current.play().catch(() => {});
+        }
+      });
+    } catch (error: any) {
+      if (error?.name !== "AbortError" && error?.name !== "NotAllowedError") {
+        toast({
+          title: "No se pudo compartir",
+          description: "Revisa el permiso para compartir la pantalla e inténtalo otra vez.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [stopScreenShare, toast]);
+
   // Restart stream when camera or facingMode changes (only if already initialized)
   useEffect(() => {
     if (streamReady) {
@@ -125,6 +172,7 @@ export default function LivePage() {
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
       audioCtxRef.current?.close();
     };
   }, []);
@@ -144,8 +192,8 @@ export default function LivePage() {
   }, []);
 
   const captureFrame = useCallback((): string | null => {
-    const video = videoRef.current;
-    if (!video || !cameraOn || video.readyState < 2) return null;
+    const video = screenSharing ? screenVideoRef.current : videoRef.current;
+    if (!video || (!screenSharing && !cameraOn) || video.readyState < 2) return null;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -153,16 +201,24 @@ export default function LivePage() {
     if (!ctx) return null;
     ctx.drawImage(video, 0, 0);
     return canvas.toDataURL("image/jpeg", 0.7);
-  }, [cameraOn]);
+  }, [cameraOn, screenSharing]);
 
-  const startRecording = useCallback(async () => {
-    let stream = streamRef.current;
+  const startRecording = useCallback(async (existingStream?: MediaStream) => {
+    if (recorderRef.current?.state === "recording") return;
+    let stream = existingStream || streamRef.current;
     if (!stream) {
       stream = await startStream(cameraOn, facingMode);
     }
     if (!stream) return;
     const audioStream = new MediaStream(stream.getAudioTracks());
-    const recorder = new MediaRecorder(audioStream, { mimeType: "audio/webm;codecs=opus" });
+    const supportedMimeType = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/mp4",
+    ].find((type) => MediaRecorder.isTypeSupported(type));
+    const recorder = supportedMimeType
+      ? new MediaRecorder(audioStream, { mimeType: supportedMimeType })
+      : new MediaRecorder(audioStream);
     chunksRef.current = [];
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
@@ -174,6 +230,27 @@ export default function LivePage() {
     setUserText("");
     setAiText("");
   }, [startStream, cameraOn, facingMode]);
+
+  // Ask for microphone permission and begin live listening when the page opens.
+  // Browsers may still require a tap; in that case the main microphone button
+  // remains available as the fallback.
+  const autoStartedMicRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedMicRef.current) return;
+    autoStartedMicRef.current = true;
+    let cancelled = false;
+    void (async () => {
+      const stream = await startStream(false, "user");
+      if (!cancelled && stream && !recorderRef.current) {
+        await startRecording(stream);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // This runs once for the live page, not every time the camera changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stopRecording = useCallback(async () => {
     const recorder = recorderRef.current;
@@ -349,6 +426,34 @@ export default function LivePage() {
         )}
       </div>
 
+      {/* Screen share preview. It is intentionally large so the assistant can
+          see the phone or game clearly, with a quick way to stop sharing. */}
+      {screenSharing && (
+        <div className="absolute top-16 left-3 right-3 bottom-24 z-10 overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl">
+          <video
+            ref={screenVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="h-full w-full object-contain bg-black"
+            data-testid="video-screen-share"
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={stopScreenShare}
+            className="absolute right-2 top-2 h-9 w-9 rounded-full bg-black/70 text-white hover:bg-black/90"
+            title="Quitar pantalla compartida"
+            data-testid="button-stop-screen-share"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+          <div className="absolute bottom-2 left-2 rounded-full bg-black/60 px-3 py-1 text-[11px] text-white/80">
+            Pantalla compartida
+          </div>
+        </div>
+      )}
+
       {/* Captions overlay */}
       <div className="absolute bottom-32 left-0 right-0 z-10 px-4 pointer-events-none">
         <div className="max-w-2xl mx-auto space-y-2">
@@ -404,6 +509,19 @@ export default function LivePage() {
             data-testid="button-flip-camera"
           >
             <SwitchCamera className="w-5 h-5" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            className={`w-12 h-12 rounded-full text-white ${
+              screenSharing ? "bg-blue-500/80 hover:bg-blue-500" : "bg-white/10 hover:bg-white/20"
+            }`}
+            onClick={screenSharing ? stopScreenShare : startScreenShare}
+            data-testid="button-toggle-screen-share"
+            title={screenSharing ? "Dejar de compartir pantalla" : "Compartir pantalla"}
+          >
+            {screenSharing ? <ScreenShareOff className="w-5 h-5" /> : <ScreenShare className="w-5 h-5" />}
           </Button>
         </div>
       </div>

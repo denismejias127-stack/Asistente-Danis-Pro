@@ -10,8 +10,10 @@ const app = express();
 
 app.set("trust proxy", 1);
 app.use(cors({ origin: "*" })); // CORS abierto para tu APK
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ChatDanis can receive generated HTML games and compressed camera frames.
+// Keep the limit finite, but large enough for a complete preview payload.
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(getSession());
 
 // Middleware para ver en la consola si el APK está intentando tocar el servidor

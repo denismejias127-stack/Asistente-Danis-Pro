@@ -61,7 +61,7 @@ export default function LoginPage() {
             { icon: "💬", text: "Chat en cualquier idioma" },
             { icon: "🎙️", text: "Mensajes de voz con IA" },
             { icon: "🎨", text: "Generación de imágenes" },
-            { icon: "⚡", text: "Modos: Rápido, Pensar y Pro" },
+            { icon: "⚡", text: "Modos: Rápido, Normal, Pensamiento y Pro" },
           ].map(({ icon, text }) => (
             <div key={text} className="flex items-center gap-3 text-sm">
               <span className="text-xl">{icon}</span>
